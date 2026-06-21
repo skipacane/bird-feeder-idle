@@ -53,6 +53,7 @@ let birds=[], floats=[], seeds=[];
 let occupied=new Set();
 let spawnTimer=2.0, fillTimer=0;
 let pendingOffline=null;
+let bgInterval=null, bgLast=0, bgGained=0;   // background-tab idle accrual
 const suburbSpecies = BIRDS.filter(b=>b.area==="suburb");
 const pool = spawnPoolForArea("suburb");
 const poolTotalWeight = pool.reduce((s,p)=>s+p.weight,0);
@@ -75,20 +76,25 @@ function load(){
     }
   }catch(e){ state=defaultState(); }
 }
-function applyOffline(){
-  const dtMs=Date.now()-(state.lastSave||Date.now());
-  let secs=Math.min(dtMs/1000, CONFIG.offlineCapHours*3600);
-  if(secs<30 || fillerCount()<=0) return;
+/* Idle accrual used both for offline progress and while the tab is
+   backgrounded. Helpers keep the feeder topped up and serve visitors. */
+function accrue(seconds){
+  seconds=Math.min(seconds, CONFIG.offlineCapHours*3600);
+  if(seconds<=0 || fillerCount()<=0) return 0;
   const seedPerSec=fillerCount()/fillInterval();
   const visitPerSec=1/spawnInterval();
   const servedPerSec=Math.min(visitPerSec,seedPerSec);
   let avg=0; for(const p of pool) avg+=p.bird.points*(p.weight/poolTotalWeight);
-  const served=servedPerSec*secs;
+  const served=servedPerSec*seconds;
   const gained=Math.floor(served*avg*pointMult()*0.6);
-  if(gained>0){
-    state.points+=gained; state.happyVisits+=Math.floor(served); state.food=capacity();
-    pendingOffline={ gained, mins:Math.round(secs/60) };
-  }
+  if(gained>0){ state.points+=gained; state.happyVisits+=Math.floor(served); state.food=capacity(); }
+  return gained;
+}
+function applyOffline(){
+  const secs=(Date.now()-(state.lastSave||Date.now()))/1000;
+  if(secs<30) return;
+  const gained=accrue(secs);
+  if(gained>0) pendingOffline={ gained, mins:Math.round(Math.min(secs,CONFIG.offlineCapHours*3600)/60) };
 }
 
 /* ============================================================
@@ -407,18 +413,28 @@ function buildAreas(){
 }
 
 /* ============================================================
-   AUDIO
+   AUDIO  — WebAudio sound effects + procedural ambient soundscape
+   (a soft wind bed and occasional gentle birdsong). No assets.
    ============================================================ */
 let actx=null;
-function tone(freq,dur,type="sine",gain=0.05,delay=0){
-  if(state.muted) return;
+const ambient={ started:false, master:null, birdTimer:null };
+
+function ensureAudio(){
   try{
     actx=actx||new (window.AudioContext||window.webkitAudioContext)();
-    const o=actx.createOscillator(), g=actx.createGain(), t0=actx.currentTime+delay;
+    if(actx.state==="suspended") actx.resume();
+  }catch(e){ actx=null; }
+  return actx;
+}
+function tone(freq,dur,type="sine",gain=0.05,delay=0){
+  if(state.muted) return;
+  const ctx=ensureAudio(); if(!ctx) return;
+  try{
+    const o=ctx.createOscillator(), g=ctx.createGain(), t0=ctx.currentTime+delay;
     o.type=type; o.frequency.setValueAtTime(freq,t0);
     g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(gain,t0+0.01);
     g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
-    o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0+dur+0.02);
+    o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0+dur+0.02);
   }catch(e){}
 }
 function sfx(kind){
@@ -430,6 +446,76 @@ function sfx(kind){
     case "buy":      tone(520,0.07,"square",0.04); tone(780,0.09,"square",0.035,0.06); break;
     case "scatter":  tone(440,0.05,"triangle",0.03); break;
   }
+}
+
+/* ---- ambient soundscape ---- */
+function makeNoiseBuffer(ctx, secs){
+  const len=Math.floor(ctx.sampleRate*secs);
+  const buf=ctx.createBuffer(1,len,ctx.sampleRate);
+  const d=buf.getChannelData(0); let last=0;
+  for(let i=0;i<len;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.2; }
+  return buf;
+}
+function startAmbient(){
+  if(ambient.started) return;
+  const ctx=ensureAudio(); if(!ctx) return;
+  ambient.started=true;
+  try{
+    const master=ctx.createGain();
+    master.gain.value=0;
+    master.connect(ctx.destination);
+    ambient.master=master;
+
+    // breezy wind bed: looping noise -> lowpass, gently modulated
+    const wind=ctx.createBufferSource(); wind.buffer=makeNoiseBuffer(ctx,3); wind.loop=true;
+    const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=480;
+    const wg=ctx.createGain(); wg.gain.value=0.05;
+    wind.connect(lp).connect(wg).connect(master); wind.start();
+    const lfo=ctx.createOscillator(); lfo.frequency.value=0.08;
+    const lfoAmt=ctx.createGain(); lfoAmt.gain.value=240;
+    lfo.connect(lfoAmt).connect(lp.frequency); lfo.start();
+    const lfo2=ctx.createOscillator(); lfo2.frequency.value=0.05;
+    const lfo2Amt=ctx.createGain(); lfo2Amt.gain.value=0.02;
+    lfo2.connect(lfo2Amt).connect(wg.gain); lfo2.start();
+
+    master.gain.setTargetAtTime(state.muted?0:0.9, ctx.currentTime, 1.5);
+    scheduleAmbientBird();
+  }catch(e){ ambient.started=false; }
+}
+function setAmbientMuted(muted){
+  if(ambient.master && actx){
+    try{ ambient.master.gain.setTargetAtTime(muted?0:0.9, actx.currentTime, 0.4); }catch(e){}
+  }
+}
+function scheduleAmbientBird(){
+  clearTimeout(ambient.birdTimer);
+  ambient.birdTimer=setTimeout(()=>{
+    if(!state.muted) playAmbientBird();
+    scheduleAmbientBird();
+  }, 2200+Math.random()*5200);
+}
+function playAmbientBird(){
+  const ctx=actx; if(!ctx || !ambient.master) return;
+  try{
+    const dest=ctx.createGain(); dest.gain.value=1;
+    if(ctx.createStereoPanner){ const pan=ctx.createStereoPanner(); pan.pan.value=(Math.random()*2-1)*0.7; dest.connect(pan).connect(ambient.master); }
+    else dest.connect(ambient.master);
+    const base=1300+Math.random()*1500;
+    const notes=2+((Math.random()*4)|0);
+    let tt=ctx.currentTime;
+    for(let i=0;i<notes;i++){
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type="sine";
+      const f=base*(0.82+Math.random()*0.5);
+      o.frequency.setValueAtTime(f,tt);
+      o.frequency.linearRampToValueAtTime(f*(1+(Math.random()*0.18-0.09)), tt+0.08);
+      g.gain.setValueAtTime(0,tt);
+      g.gain.linearRampToValueAtTime(0.05,tt+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,tt+0.12);
+      o.connect(g).connect(dest); o.start(tt); o.stop(tt+0.14);
+      tt+=0.06+Math.random()*0.07;
+    }
+  }catch(e){}
 }
 
 /* ============================================================
@@ -459,6 +545,26 @@ function closePanels(){
   document.querySelectorAll(".overlay").forEach(o=>o.classList.add("hidden"));
 }
 
+/* keep the game progressing while the tab is hidden / minimized:
+   the rAF loop is paused by the browser, so we accrue idle progress
+   on a timer and credit anything earned when the player returns. */
+function onHidden(){
+  save();
+  bgLast=Date.now(); bgGained=0;
+  clearInterval(bgInterval);
+  bgInterval=setInterval(()=>{
+    const now=Date.now(); bgGained+=accrue((now-bgLast)/1000); bgLast=now; save();
+  }, 15000);
+}
+function onVisible(){
+  clearInterval(bgInterval); bgInterval=null;
+  if(bgLast){ bgGained+=accrue((Date.now()-bgLast)/1000); bgLast=0; }
+  if(actx && actx.state==="suspended") actx.resume();
+  if(bgGained>0){ refreshHUD(); ticker(`While away, your helpers earned ✨${Math.floor(bgGained)}. 🪶`); }
+  bgGained=0;
+  lastTs=0;   // prevents a giant dt on the first resumed frame
+}
+
 function wireUI(){
   $("scatterBtn").addEventListener("click", scatter);
   $("btnShop").addEventListener("click", ()=>openPanel("overlayShop"));
@@ -472,7 +578,12 @@ function wireUI(){
     o.addEventListener("click", e=>{ if(e.target===o) o.classList.add("hidden"); });
   });
 
-  $("muteBtn").addEventListener("click", ()=>{ state.muted=!state.muted; $("muteBtn").textContent=state.muted?"🔇":"🔊"; save(); });
+  $("muteBtn").addEventListener("click", ()=>{
+    state.muted=!state.muted;
+    $("muteBtn").textContent=state.muted?"🔇":"🔊";
+    if(state.muted){ setAmbientMuted(true); } else { startAmbient(); setAmbientMuted(false); }
+    save();
+  });
   $("resetBtn").addEventListener("click", ()=>{
     if(confirm("Reset all progress and start a fresh backyard?")){
       try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
@@ -487,6 +598,18 @@ function wireUI(){
     if(e.code==="Escape"){ closePanels(); }
   });
   window.addEventListener("beforeunload", save);
+
+  // browsers block audio until a user gesture — start the soundscape then
+  const startAudioOnce=()=>{
+    ensureAudio(); if(!state.muted) startAmbient();
+    window.removeEventListener("pointerdown", startAudioOnce);
+    window.removeEventListener("keydown", startAudioOnce);
+  };
+  window.addEventListener("pointerdown", startAudioOnce);
+  window.addEventListener("keydown", startAudioOnce);
+
+  // keep progressing while the tab is hidden / minimized
+  document.addEventListener("visibilitychange", ()=> document.hidden ? onHidden() : onVisible());
 }
 
 /* ============================================================

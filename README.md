@@ -13,12 +13,17 @@ Just open **`index.html`** in any modern browser (Chrome, Edge, Firefox).
 No build step, no server, no installs. Your progress saves automatically to the
 browser (localStorage) and keeps earning gently while you're away once you hire help.
 
+A cozy **ambient soundscape** (a soft breeze with occasional birdsong) is generated
+live with WebAudio — toggle it with the 🔊 button. The game also **keeps running in
+the background**: minimise or switch tabs and your helpers keep working; anything they
+earn is credited (and announced) when you return.
+
 ### Controls
 - **Scatter Seed** button / **Spacebar** / **click the feeder** — add seed to the tray.
 - **🛠️ Shop** button — spend Bird Points on upgrades.
 - **📖 Birds** button — your collection; click a discovered bird for its species card.
 - **🗺️ Areas** button — habitats to unlock (more coming!).
-- **Esc** — close any open menu.
+- **🔊 / 🔇** — toggle all sound (effects + ambient). **Esc** — close any open menu.
 
 ## 🎮 The core loop
 
