@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# Local dev / render artifacts (not part of the game)
+_smoke.js
+_render.js
+_preview_*.png

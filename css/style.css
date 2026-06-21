@@ -1,0 +1,247 @@
+/* ===========================================================
+   Backyard Birds — fullscreen pixel-art cozy idle
+   Wooden "Stardew" menu frames + warm woodland palette
+   =========================================================== */
+:root{
+  --ink:#46371f; --ink-soft:#7c674a;
+  --wood:#a26a30; --wood-dk:#7c5230; --wood-lt:#c89a5b;
+  --parch:#f6e9cf; --parch-2:#efddbd;
+  --accent:#c97b3c; --leaf:#6b8f5e; --gold:#e0a92e; --rose:#c75b6e;
+  --r-common:#7c9c6a; --r-uncommon:#4f8ab0; --r-rare:#b067c0; --r-legendary:#d99a2b;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; margin:0; overflow:hidden; }
+body{
+  font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+  color:var(--ink);
+  background:#bfe0ef;
+  -webkit-font-smoothing:antialiased;
+  user-select:none; -webkit-user-select:none;
+  cursor:default;
+}
+
+/* ---------- fullscreen scene ---------- */
+#game{
+  position:fixed; inset:0;
+  width:100vw; height:100vh;
+  display:block;
+  object-fit:cover;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+  background:#a9d2e6;
+  z-index:0;
+}
+
+/* ---------- wooden pixel panel ---------- */
+.panel{
+  background:var(--parch);
+  border:3px solid var(--wood-lt);
+  border-radius:9px;
+  box-shadow:0 0 0 3px var(--wood-dk), 0 5px 0 rgba(80,52,28,.45), inset 0 0 0 2px #fff6e2;
+  color:var(--ink);
+}
+
+/* ---------- HUD ---------- */
+#hud{
+  position:fixed; top:12px; left:12px; z-index:10;
+  display:flex; align-items:center; gap:16px;
+  padding:8px 14px;
+}
+.hud-title{ display:flex; align-items:center; gap:9px; }
+.hud-title .logo{ font-size:24px; }
+.hud-title b{ display:block; font-size:15px; letter-spacing:.3px; }
+.hud-title .area-name{ font-size:11px; color:var(--ink-soft); }
+.stats{ display:flex; gap:8px; }
+.stat{
+  display:flex; align-items:center; gap:5px;
+  background:var(--parch-2); border:2px solid var(--wood-lt);
+  border-radius:7px; padding:4px 9px; font-weight:800;
+}
+.stat .si{ font-size:14px; }
+.stat .sv{ font-size:16px; }
+.stat .mut{ font-size:11px; color:var(--ink-soft); }
+.stat.flash{ animation:pop .4s ease; }
+@keyframes pop{ 0%{transform:scale(1)} 40%{transform:scale(1.16)} 100%{transform:scale(1)} }
+
+/* ---------- mini controls ---------- */
+#miniControls{ position:fixed; top:12px; right:12px; z-index:10; display:flex; gap:6px; }
+.icon-btn{
+  width:38px; height:38px; font-size:17px; cursor:pointer;
+  background:var(--parch); color:var(--ink);
+  border:3px solid var(--wood-lt); border-radius:9px;
+  box-shadow:0 3px 0 var(--wood-dk);
+}
+.icon-btn:active{ transform:translateY(3px); box-shadow:0 0 0 var(--wood-dk); }
+
+/* ---------- ticker ---------- */
+#ticker{
+  position:fixed; left:12px; bottom:78px; z-index:10;
+  padding:6px 12px; font-size:12px; color:var(--ink-soft);
+  max-width:46vw;
+}
+
+/* ---------- toasts ---------- */
+#toasts{
+  position:fixed; top:64px; left:50%; transform:translateX(-50%);
+  z-index:20; display:flex; flex-direction:column; gap:8px; align-items:center;
+}
+.toast{
+  display:flex; align-items:center; gap:10px;
+  background:var(--parch); border:3px solid var(--wood-lt); border-radius:9px;
+  box-shadow:0 0 0 3px var(--wood-dk), 0 4px 0 rgba(80,52,28,.4);
+  padding:7px 14px 7px 8px; font-size:13px; font-weight:700;
+  animation:toastIn .3s cubic-bezier(.2,1.4,.4,1), toastOut .4s ease 3.4s forwards;
+}
+.toast canvas{ width:40px; height:34px; image-rendering:pixelated; }
+.toast small{ display:block; font-weight:600; color:var(--ink-soft); }
+@keyframes toastIn{ from{opacity:0; transform:translateY(-12px) scale(.9)} to{opacity:1} }
+@keyframes toastOut{ to{opacity:0; transform:translateY(-8px)} }
+
+/* ---------- action bar ---------- */
+#actionBar{
+  position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+  z-index:10; display:flex; align-items:flex-end; gap:10px;
+}
+.menu-btn{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  min-width:66px; padding:8px 10px 7px; cursor:pointer;
+  font-size:12px; font-weight:800; color:var(--ink);
+  background:var(--parch); border:3px solid var(--wood-lt); border-radius:9px;
+  box-shadow:0 4px 0 var(--wood-dk);
+}
+.menu-btn span{ font-size:18px; }
+.menu-btn:hover{ background:#fbf1d9; }
+.menu-btn:active{ transform:translateY(4px); box-shadow:0 0 0 var(--wood-dk); }
+
+.scatter-btn{
+  display:flex; flex-direction:column; align-items:center; line-height:1.15;
+  padding:12px 26px; cursor:pointer; font-size:17px; font-weight:900;
+  color:#43301a; letter-spacing:.3px;
+  background:#f3b14e; border:3px solid #a35e26; border-radius:11px;
+  box-shadow:0 5px 0 #8a4d1f;
+}
+.scatter-btn .scatter-ico{ font-size:18px; }
+.scatter-btn small{ font-size:10px; font-weight:700; opacity:.7; }
+.scatter-btn:hover{ filter:brightness(1.05); }
+.scatter-btn:active{ transform:translateY(5px); box-shadow:0 0 0 #8a4d1f; }
+
+/* ---------- overlay panels ---------- */
+.overlay{
+  position:fixed; inset:0; z-index:40;
+  background:rgba(40,28,16,.5);
+  display:grid; place-items:center;
+  animation:fadeIn .18s ease;
+}
+.overlay.hidden{ display:none; }
+@keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+.sheet{
+  width:min(560px,92vw); max-height:84vh; overflow:hidden;
+  display:flex; flex-direction:column;
+  background:var(--parch);
+  border:4px solid var(--wood-lt); border-radius:12px;
+  box-shadow:0 0 0 4px var(--wood-dk), 0 12px 0 rgba(80,52,28,.4);
+  animation:sheetIn .25s cubic-bezier(.2,1.3,.4,1);
+}
+@keyframes sheetIn{ from{opacity:0; transform:translateY(14px) scale(.97)} to{opacity:1} }
+.sheet-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-bottom:3px solid var(--wood-lt);
+  background:var(--parch-2);
+}
+.sheet-head h2{ margin:0; font-size:18px; }
+.sheet-close{
+  width:30px; height:30px; cursor:pointer; font-size:14px; font-weight:900;
+  background:var(--parch); color:var(--ink);
+  border:2px solid var(--wood-lt); border-radius:7px; box-shadow:0 2px 0 var(--wood-dk);
+}
+.sheet-close:active{ transform:translateY(2px); box-shadow:none; }
+.sheet-intro{ margin:10px 16px 4px; font-size:12.5px; color:var(--ink-soft); }
+.shop-list,.index-grid,.area-list{ padding:8px 16px 16px; overflow-y:auto; }
+.shop-list::-webkit-scrollbar,.index-grid::-webkit-scrollbar,.area-list::-webkit-scrollbar{ width:10px; }
+.shop-list::-webkit-scrollbar-thumb,.index-grid::-webkit-scrollbar-thumb,.area-list::-webkit-scrollbar-thumb{ background:var(--wood-lt); border-radius:6px; }
+
+/* ---------- shop ---------- */
+.shop-list{ display:flex; flex-direction:column; gap:9px; }
+.shop-item{
+  display:flex; align-items:center; gap:12px;
+  background:var(--parch-2); border:2px solid var(--wood-lt); border-radius:9px; padding:9px;
+}
+.shop-ico{
+  width:42px; height:42px; flex-shrink:0; display:grid; place-items:center; font-size:22px;
+  background:var(--parch); border:2px solid var(--wood-lt); border-radius:8px;
+}
+.shop-info{ flex:1; min-width:0; }
+.shop-info h3{ margin:0; font-size:14px; }
+.shop-info .lvl{ font-size:11px; color:var(--leaf); font-weight:800; }
+.shop-info p{ margin:2px 0 0; font-size:11.5px; color:var(--ink-soft); line-height:1.3; }
+.buy-btn{
+  flex-shrink:0; min-width:78px; cursor:pointer; line-height:1.1;
+  display:flex; flex-direction:column; align-items:center;
+  background:#7fa86d; color:#fff; font-weight:900; font-size:13px;
+  border:2px solid #4f7042; border-radius:8px; padding:8px;
+  box-shadow:0 3px 0 #4f7042;
+}
+.buy-btn small{ font-size:10px; font-weight:700; opacity:.92; }
+.buy-btn:active{ transform:translateY(3px); box-shadow:none; }
+.buy-btn:disabled{ background:#cdbf9f; color:#8c7c5e; border-color:#b6a684; box-shadow:0 3px 0 #b6a684; cursor:not-allowed; }
+.buy-btn.maxed{ background:var(--wood-lt); border-color:var(--wood-dk); box-shadow:0 3px 0 var(--wood-dk); cursor:default; }
+
+/* ---------- bird index ---------- */
+.index-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.index-cell{
+  position:relative; text-align:center; cursor:pointer;
+  background:var(--parch-2); border:2px solid var(--wood-lt); border-radius:9px;
+  padding:6px 4px 8px;
+}
+.index-cell.found:hover{ transform:translateY(-2px); border-color:var(--leaf); }
+.index-cell.locked{ cursor:default; opacity:.9; }
+.index-cell canvas{ width:72px; height:60px; image-rendering:pixelated; }
+.index-cell .ic-name{ font-size:10.5px; font-weight:800; line-height:1.1; margin-top:2px; }
+.index-cell .ic-name.locked{ color:var(--ink-soft); }
+.index-cell .ic-dot{ position:absolute; top:6px; right:6px; width:9px; height:9px; border-radius:50%; border:1.5px solid rgba(0,0,0,.18); }
+.index-cell.new::after{
+  content:"NEW"; position:absolute; top:4px; left:4px;
+  background:var(--rose); color:#fff; font-size:8px; font-weight:900;
+  padding:1px 4px; border-radius:5px; letter-spacing:.5px;
+}
+
+/* ---------- areas ---------- */
+.area-list{ display:flex; flex-direction:column; gap:9px; }
+.area-card{
+  display:flex; align-items:center; gap:12px;
+  background:var(--parch-2); border:2px solid var(--wood-lt); border-radius:9px; padding:11px;
+}
+.area-card.locked{ opacity:.7; filter:saturate(.55); }
+.area-card.active{ border-color:var(--accent); background:#fff5e4; }
+.area-emoji{ font-size:26px; }
+.area-card h3{ margin:0; font-size:14px; }
+.area-card p{ margin:2px 0 0; font-size:11.5px; color:var(--ink-soft); }
+.area-tag{ margin-left:auto; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:.5px; padding:3px 8px; border-radius:7px; }
+.area-tag.on{ background:var(--leaf); color:#fff; }
+.area-tag.off{ background:var(--wood-lt); color:#5a4327; }
+
+/* ---------- species card ---------- */
+.card-pop{
+  position:relative; width:300px; text-align:center; padding:18px;
+  background:var(--parch);
+  border:4px solid var(--wood-lt); border-radius:14px;
+  box-shadow:0 0 0 4px var(--wood-dk), 0 12px 0 rgba(80,52,28,.4);
+  animation:sheetIn .25s cubic-bezier(.2,1.3,.4,1);
+}
+.card-pop .sheet-close{ position:absolute; top:10px; right:10px; }
+.card-pop canvas{
+  width:192px; height:160px; image-rendering:pixelated;
+  background:#d9ead0; border:3px solid var(--wood-lt); border-radius:10px;
+}
+.card-pop h2{ margin:12px 0 2px; font-size:19px; }
+.card-rarity{ font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:1px; }
+.card-pop p{ font-size:12.5px; color:var(--ink-soft); margin:9px 6px; line-height:1.4; }
+.card-stats{ display:flex; justify-content:space-around; font-size:13px; padding-top:8px; border-top:2px dashed var(--wood-lt); }
+
+@media (max-width:560px){
+  #hud{ flex-direction:column; align-items:flex-start; gap:6px; }
+  .hud-title b{ font-size:13px; }
+  .menu-btn{ min-width:56px; }
+  .scatter-btn{ padding:10px 16px; font-size:15px; }
+}
