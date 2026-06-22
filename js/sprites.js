@@ -98,52 +98,102 @@ const Sprites = (() => {
     let s=7; const rnd=()=>(s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff;
     for(let i=0;i<24;i++) distantPines.push({x:Math.round(rnd()*L.W), s:0.26+rnd()*0.16});
   })();
+  /* per-area decoration (deterministic) */
+  function seeded(seed){ let s=seed; return ()=>(s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff; }
+  const forestTrees=[]; (function(){ const r=seeded(51); for(let i=0;i<14;i++) forestTrees.push({x:Math.round(r()*L.W),dy:2+Math.round(r()*8),s:0.5+r()*0.7,type:r()>0.45?"pine":"oak"}); forestTrees.sort((a,b)=>a.s-b.s); })();
+  const forestBushes=[]; (function(){ const r=seeded(77); for(let i=0;i<8;i++) forestBushes.push({x:Math.round(r()*L.W),y:Math.round(L.horizon+18+r()*44),rr:6+r()*6}); })();
+  const reeds=[]; (function(){ const r=seeded(33); for(let i=0;i<28;i++) reeds.push({x:Math.round(r()*L.W),dy:18+Math.round(r()*12),h:9+Math.round(r()*13)}); })();
+  const lilypads=[]; (function(){ const r=seeded(88); for(let i=0;i<10;i++) lilypads.push({x:Math.round(r()*L.W),y:Math.round(L.horizon+44+r()*(L.H-L.horizon-54))}); })();
+  const mtnPines=[]; (function(){ const r=seeded(63); for(let i=0;i<12;i++) mtnPines.push({x:Math.round(r()*L.W),dy:2+Math.round(r()*8),s:0.5+r()*0.8}); })();
+  const rocks=[]; (function(){ const r=seeded(44); for(let i=0;i<7;i++) rocks.push({x:Math.round(r()*L.W),dy:14+Math.round(r()*36),s:0.7+r()*0.9}); })();
+  const snowPatches=[]; (function(){ const r=seeded(55); for(let i=0;i<10;i++) snowPatches.push({x:Math.round(r()*L.W),y:Math.round(L.horizon+16+r()*(L.H-L.horizon-22)),rr:5+r()*7}); })();
+
+  /* active (season-tinted) foliage palettes */
+  let curOak=OAK, curPine=PINE;
+  function seasonTheme(season){
+    let oak=OAK, pine=PINE, gh=GROUND_HI, gl=GROUND_LO, gd=GROUND_DK, snow=false;
+    if(season===0){ oak=OAK.map(c=>shade(c,0.05)); gh=shade(GROUND_HI,0.05); }                       // spring
+    else if(season===2){ oak=["#a85f24","#cf8a2e","#e3ab3c","#7c4718"]; gh="#abb756"; gl="#8c9c42"; gd="#717f32"; }  // autumn
+    else if(season===3){ oak=OAK.map(c=>shade(c,-0.06)); pine=PINE.map(c=>shade(c,-0.04)); gh="#e9eff3"; gl="#d6dfe6"; gd="#bcc8d1"; snow=true; }  // winter
+    return { oak, pine, gh, gl, gd, snow };
+  }
 
   /* ===========================================================
      BACKGROUND
      =========================================================== */
-  function drawBackground(ctx, t){
+  function drawBackground(ctx, t, env){
+    env=env||{};
+    const season=env.season||0, area=env.area||"suburb", weather=env.weather||"clear";
+    const TH=seasonTheme(season); curOak=TH.oak; curPine=TH.pine;
     const {W,H,horizon}=L;
-    // smooth sky gradient (saturated blue -> pale haze near horizon)
-    const skT=[0x46,0xad,0xe8], skB=[0xd6,0xef,0xf4];
+
+    drawSky(ctx, weather);
+    if(weather!=="rain"){ pell(ctx,64,30,14,14,"#fce9a6"); pell(ctx,64,30,10,10,"#fff6cf"); }
+    for(const c of clouds){ const x=Math.round(((c.x+t*c.spd)%(W+90))-45); drawCloud(ctx,x,c.y,c.s, weather!=="clear"); }
+    if(weather!=="clear") for(let i=0;i<3;i++){ const c=clouds[i]; const x=Math.round(((c.x+150+t*c.spd*0.7)%(W+90))-45); drawCloud(ctx,x,c.y+26,c.s*0.85,true); }
+
+    drawMountains(ctx, area, TH);
+    px(ctx,0,horizon,W,7,TH.gh); px(ctx,0,horizon+7,W,H-horizon-7,TH.gl); px(ctx,0,horizon,W,1,TH.gd);
+
+    if(area==="forest") sceneForest(ctx,TH);
+    else if(area==="wetland") sceneWetland(ctx,TH,t);
+    else if(area==="mountain") sceneMountain(ctx,TH);
+    else sceneSuburb(ctx,TH);
+
+    if(area!=="wetland"){ pell(ctx,L.feeder.x,L.groundContact+8,40,9,"#b08f5e"); pell(ctx,L.feeder.x,L.groundContact+8,32,6,"#c4a674"); }
+
+    if(area!=="wetland"){
+      for(const g of grassTufts){ px(ctx,g.x,g.y,1,3,TH.gd); px(ctx,g.x+(g.d?1:-1),g.y+1,1,2,shade(TH.gl,-0.22)); dot(ctx,g.x,g.y-1,TH.gh); }
+      if(TH.snow) for(const f of flowers){ dot(ctx,f.x,f.y-1,"#ffffff"); }
+      else for(const f of flowers){ px(ctx,f.x,f.y+1,1,2,TH.gd); dot(ctx,f.x,f.y,f.c); dot(ctx,f.x+1,f.y,shade(f.c,-0.18)); }
+    }
+  }
+
+  function drawSky(ctx, weather){
+    const {W,horizon}=L;
+    let a=[0x46,0xad,0xe8], b=[0xd6,0xef,0xf4];
+    if(weather!=="clear"){ a=[0x90,0xa6,0xb4]; b=[0xcb,0xd5,0xd8]; }
     for(let y=0;y<horizon;y++){ const k=y/horizon;
-      px(ctx,0,y,W,1,`rgb(${Math.round(skT[0]+(skB[0]-skT[0])*k)},${Math.round(skT[1]+(skB[1]-skT[1])*k)},${Math.round(skT[2]+(skB[2]-skT[2])*k)})`);
+      px(ctx,0,y,W,1,`rgb(${Math.round(a[0]+(b[0]-a[0])*k)},${Math.round(a[1]+(b[1]-a[1])*k)},${Math.round(a[2]+(b[2]-a[2])*k)})`);
     }
-
-    // sun
-    pell(ctx,64,30,14,14,"#fce9a6"); pell(ctx,64,30,10,10,"#fff6cf");
-
-    // clouds
-    for(const c of clouds){ const x=Math.round(((c.x+t*c.spd)%(W+90))-45); drawCloud(ctx,x,c.y,c.s); }
-
-    // layered mountains
-    ridge(ctx,horizon,58,0.017,0.6,MTN_B,MTN_B_HI);
-    ridge(ctx,horizon,38,0.025,2.4,MTN_F,MTN_F_HI);
-
-    // ground
-    px(ctx,0,horizon,W,7,GROUND_HI);
-    px(ctx,0,horizon+7,W,H-horizon-7,GROUND_LO);
-    px(ctx,0,horizon,W,1,GROUND_DK);
-
-    // distant pine treeline, neighbour houses, foreground trees
-    for(const p of distantPines) drawPine(ctx,p.x,horizon+2,p.s);
-    for(const h of houses) drawHouse(ctx,h,horizon);
-    for(const tr of bgTrees){ tr.type==="oak"?drawOak(ctx,tr.x,horizon+5,tr.s):drawPine(ctx,tr.x,horizon+5,tr.s); }
-
-    // fence
-    drawFence(ctx, horizon+13);
-
-    // worn dirt patch under the feeder
-    pell(ctx,L.feeder.x,L.groundContact+8,40,9,"#b08f5e");
-    pell(ctx,L.feeder.x,L.groundContact+8,32,6,"#c4a674");
-
-    // front-lawn grass tufts + flowers
-    for(const g of grassTufts){
-      px(ctx,g.x,g.y,1,3,GROUND_DK);
-      px(ctx,g.x+(g.d?1:-1),g.y+1,1,2,shade(GROUND_LO,-0.22));
-      dot(ctx,g.x,g.y-1,GROUND_HI);
-    }
-    for(const f of flowers){ px(ctx,f.x,f.y+1,1,2,GROUND_DK); dot(ctx,f.x,f.y,f.c); dot(ctx,f.x+1,f.y,shade(f.c,-0.18)); }
+  }
+  function drawMountains(ctx, area, TH){
+    const h=L.horizon;
+    if(area==="mountain"){ ridge(ctx,h,88,0.013,0.4,"#86a0b6","#e6eef3"); ridge(ctx,h,60,0.02,2.0,"#6f8fa0","#d4e0e6"); }
+    else { ridge(ctx,h,58,0.017,0.6,MTN_B, TH.snow?"#eef4f7":MTN_B_HI); ridge(ctx,h,38,0.025,2.4,MTN_F, TH.snow?"#e6eef2":MTN_F_HI); }
+  }
+  function sceneSuburb(ctx,TH){
+    for(const p of distantPines) drawPine(ctx,p.x,L.horizon+2,p.s);
+    for(const hh of houses) drawHouse(ctx,hh,L.horizon);
+    for(const tr of bgTrees){ tr.type==="oak"?drawOak(ctx,tr.x,L.horizon+5,tr.s):drawPine(ctx,tr.x,L.horizon+5,tr.s); }
+    drawFence(ctx, L.horizon+13);
+  }
+  function sceneForest(ctx,TH){
+    for(const tr of forestTrees){ tr.type==="oak"?drawOak(ctx,tr.x,L.horizon+tr.dy,tr.s):drawPine(ctx,tr.x,L.horizon+tr.dy,tr.s); }
+    for(const b of forestBushes){ pell(ctx,b.x,b.y,b.rr+1,b.rr*0.8+1,curOak[3]); pell(ctx,b.x,b.y,b.rr,b.rr*0.8,curOak[1]); pell(ctx,b.x-1,b.y-1,b.rr*0.5,b.rr*0.4,curOak[2]); }
+  }
+  function sceneWetland(ctx,TH,t){
+    const wT=L.horizon+26;
+    px(ctx,0,wT,L.W,L.H-wT,"#5a93b0"); px(ctx,0,wT,L.W,2,"#82b8d0");
+    for(let i=0;i<5;i++){ const yy=wT+8+i*16, off=Math.round(Math.sin(t*0.6+i)*6);
+      px(ctx,40+off,yy,28,1,"#7fb2cb"); px(ctx,210-off,yy+4,40,1,"#6ea6c2"); px(ctx,360+off,yy,24,1,"#7fb2cb"); }
+    for(const lp of lilypads){ pell(ctx,lp.x,lp.y,4,2,"#3f8a4f"); dot(ctx,lp.x,lp.y-1,"#e9a0c0"); }
+    for(const r of reeds) drawCattail(ctx,r.x,L.horizon+r.dy,r.h);
+    drawOak(ctx,50,L.horizon+6,0.64);
+  }
+  function sceneMountain(ctx,TH){
+    for(const p of mtnPines) drawPine(ctx,p.x,L.horizon+p.dy,p.s);
+    for(const r of rocks) drawRock(ctx,r.x,L.horizon+r.dy,r.s);
+    for(const s of snowPatches) pell(ctx,s.x,s.y,s.rr,s.rr*0.45,"#eef4f7");
+  }
+  function drawCattail(ctx,x,baseY,h){
+    px(ctx,x,baseY-h,1,h,"#5f7d3a");
+    px(ctx,x-2,baseY-h+4,2,h-4,"#6f9a44"); px(ctx,x+1,baseY-h+6,2,h-6,"#5f8a3a");
+    px(ctx,x-1,baseY-h-5,2,6,"#7a4a26"); dot(ctx,x-1,baseY-h-6,"#8a5a30");
+  }
+  function drawRock(ctx,x,baseY,s){
+    pell(ctx,x,baseY-3*s,8*s,5*s,"#71767c"); pell(ctx,x,baseY-3*s,8*s-1,5*s-1,"#9aa0a6");
+    pell(ctx,x-2*s,baseY-5*s,4*s,3*s,"#bcc2c8");
   }
 
   function ridge(ctx,base,amp,freq,phase,color,cap){
@@ -156,15 +206,13 @@ const Sprites = (() => {
     }
   }
 
-  function drawCloud(ctx,x,y,s){
+  function drawCloud(ctx,x,y,s,grey){
     const lobes=[[0,0,10],[11,2,8],[-10,3,7],[5,-5,8],[-3,4,7],[17,4,5]];
-    // soft underside shadow
-    lobes.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,y+dy*s+2,r*s,r*s*0.8,"#cfe6f0"));
-    // white body
-    lobes.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,y+dy*s,r*s,r*s*0.85,"#ffffff"));
-    // flat bottom + top highlight
-    px(ctx,Math.round(x-13*s),Math.round(y+5*s),Math.round(30*s),2,"#ffffff");
-    pell(ctx,x-3*s,y-4*s,5*s,3*s,"#ffffff");
+    const body=grey?"#e3e8ec":"#ffffff", shadow=grey?"#bcc6cd":"#cfe6f0";
+    lobes.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,y+dy*s+2,r*s,r*s*0.8,shadow));
+    lobes.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,y+dy*s,r*s,r*s*0.85,body));
+    px(ctx,Math.round(x-13*s),Math.round(y+5*s),Math.round(30*s),2,body);
+    pell(ctx,x-3*s,y-4*s,5*s,3*s,body);
   }
 
   function drawHouse(ctx,h,horizon){
@@ -236,26 +284,26 @@ const Sprites = (() => {
     px(ctx,x-(tw>>1),baseY-th,tw,th,TRUNK);
     px(ctx,x-(tw>>1),baseY-th,1,th,TRUNK_HI);
     px(ctx,x+(tw>>1)-1,baseY-th,1,th,TRUNK_DK);
-    const cy=baseY-th-Math.round(15*s);
+    const cy=baseY-th-Math.round(15*s), O=curOak;
     const cl=[[0,2,20],[-15,6,13],[15,5,14],[-9,-8,14],[9,-8,13],[0,-15,13],[-19,-3,10],[19,-2,11]];
-    cl.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,cy+dy*s,r*s+1,r*s+1,OAK[3]));      // outline
-    cl.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,cy+dy*s,r*s,r*s,OAK[1]));          // mid
-    cl.forEach(([dx,dy,r])=>{ if(dy>=0) pell(ctx,x+(dx+3)*s,cy+(dy+4)*s,r*0.7*s,r*0.6*s,OAK[0]); }); // shade
-    [[-9,-8,8],[0,-15,8],[-16,-1,6],[6,-12,6]].forEach(([dx,dy,r])=>pell(ctx,x+dx*s,cy+dy*s,r*s,r*s,OAK[2])); // highlight
-    for(let i=0;i<7;i++){ const a=i*1.7; dot(ctx,Math.round(x+Math.cos(a)*13*s),Math.round(cy+Math.sin(a)*11*s),OAK[3]); }
+    cl.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,cy+dy*s,r*s+1,r*s+1,O[3]));      // outline
+    cl.forEach(([dx,dy,r])=>pell(ctx,x+dx*s,cy+dy*s,r*s,r*s,O[1]));          // mid
+    cl.forEach(([dx,dy,r])=>{ if(dy>=0) pell(ctx,x+(dx+3)*s,cy+(dy+4)*s,r*0.7*s,r*0.6*s,O[0]); }); // shade
+    [[-9,-8,8],[0,-15,8],[-16,-1,6],[6,-12,6]].forEach(([dx,dy,r])=>pell(ctx,x+dx*s,cy+dy*s,r*s,r*s,O[2])); // highlight
+    for(let i=0;i<7;i++){ const a=i*1.7; dot(ctx,Math.round(x+Math.cos(a)*13*s),Math.round(cy+Math.sin(a)*11*s),O[3]); }
   }
 
   function drawPine(ctx,x,baseY,s){
     const tw=Math.max(2,Math.round(3*s));
     px(ctx,x-(tw>>1),baseY-Math.round(7*s),tw,Math.round(7*s),TRUNK);
-    const sizes=[[24,18],[19,16],[14,15],[9,13]];
+    const sizes=[[24,18],[19,16],[14,15],[9,13]], P=curPine;
     let cur=baseY-Math.round(5*s);
     sizes.forEach(([hw,h])=>{
       hw=Math.round(hw*s); h=Math.max(3,Math.round(h*s));
-      tri(ctx,x,cur,hw+1,h+1,PINE[3]);                                  // outline
-      tri(ctx,x,cur,hw,h,PINE[1]);                                      // mid
-      tri(ctx,x-Math.round(hw*0.28),cur-1,Math.round(hw*0.5),Math.round(h*0.78),PINE[2]); // sunlit left
-      tri(ctx,x+Math.round(hw*0.34),cur,Math.round(hw*0.46),Math.round(h*0.72),PINE[0]);  // shaded right
+      tri(ctx,x,cur,hw+1,h+1,P[3]);                                  // outline
+      tri(ctx,x,cur,hw,h,P[1]);                                      // mid
+      tri(ctx,x-Math.round(hw*0.28),cur-1,Math.round(hw*0.5),Math.round(h*0.78),P[2]); // sunlit left
+      tri(ctx,x+Math.round(hw*0.34),cur,Math.round(hw*0.46),Math.round(h*0.72),P[0]);  // shaded right
       cur-=Math.round(h*0.6);
     });
   }
@@ -514,7 +562,38 @@ const Sprites = (() => {
     ctx.restore();
   }
 
-  return { L, drawBackground, drawFeeder, drawBird, drawPortrait,
+  /* ---- yard decorations (bought in the shop) ---- */
+  function drawDecor(ctx,type,x,y,level){
+    x=Math.round(x); y=Math.round(y);
+    if(type==="flowers"){
+      const cols=["#e8584f","#f0c419","#ffffff","#cf6fd0","#f08a3a"];
+      const n=4+level*2;
+      pell(ctx,x,y+3,16,4,"rgba(60,90,40,.30)");
+      for(let i=0;i<n;i++){ const fx=x-12+((i*7)%26), fy=y-4-((i*5)%8);
+        px(ctx,fx,fy+1,1,3,"#4e8a35"); dot(ctx,fx,fy,cols[i%cols.length]); dot(ctx,fx+1,fy,"#f7e9a0"); }
+    } else if(type==="birdbath"){
+      pell(ctx,x,y+4,10,3,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-6,4,10,"#aaa396"); px(ctx,x-1,y-6,1,10,"#c6c1b5");   // pedestal
+      pell(ctx,x+1,y-8,9,4,"#8f8a7e"); pell(ctx,x+1,y-9,7,3,"#bfe6f2"); // basin + water
+      dot(ctx,x-1,y-9,"#ffffff");
+    }
+  }
+
+  /* ---- hawk (predator event) ---- */
+  function drawHawk(ctx,x,y,facing,flap){
+    const dir=facing>=0?1:-1; x=Math.round(x); y=Math.round(y);
+    const body="#5b4326", wing="#6e5234", belly="#c2a373", out="#2b1f12";
+    const up=Math.round(Math.sin(flap)*5);
+    pell(ctx,x-dir*12,y+1,4,2,body);                                   // tail
+    pell(ctx,x-dir*10,y-up,10,3,out); pell(ctx,x-dir*10,y-up,9,2,wing);// far wing
+    pell(ctx,x,y,8,5,out); pell(ctx,x,y,7,4,body); pell(ctx,x+dir*1,y+1,4,3,belly);
+    pell(ctx,x+dir*6,y-3,3,3,out); pell(ctx,x+dir*6,y-3,3,3,body);     // head
+    px(ctx,x+dir*9,y-2,2,1,"#e0b23a"); px(ctx,x+dir*10,y-1,1,1,"#caa024"); // beak
+    dot(ctx,x+dir*7,y-3,"#f7e24a");                                   // eye
+    pell(ctx,x+dir*10,y-up,10,3,out); pell(ctx,x+dir*10,y-up,9,2,wing);// near wing
+  }
+
+  return { L, drawBackground, drawFeeder, drawBird, drawPortrait, drawDecor, drawHawk,
            perchSlots, standHeight, pixelText, pixelTextWidth, shade };
 })();
 

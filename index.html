@@ -7,44 +7,51 @@
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <!-- Fullscreen pixel-art game scene -->
   <canvas id="game" width="480" height="270"></canvas>
 
   <!-- Floating HUD -->
   <header id="hud" class="panel">
     <div class="hud-title">
       <span class="logo">🐦</span>
-      <div>
-        <b>Backyard Birds</b>
-        <span class="area-name" id="areaName">Suburban Backyard</span>
-      </div>
+      <div><b>Backyard Birds</b><span class="area-name" id="areaName">Suburban Backyard</span></div>
     </div>
     <div class="stats">
       <div class="stat" title="Bird Points"><span class="si">✨</span><span class="sv" id="pointsVal">0</span></div>
-      <div class="stat" title="Seed in feeder"><span class="si">🌾</span><span class="sv"><span id="foodVal">0</span><span class="mut">/<span id="capVal">5</span></span></span></div>
+      <div class="stat" title="Feathers (prestige currency)"><span class="si">🪶</span><span class="sv" id="featherVal">0</span></div>
+      <div class="stat" title="Seed in feeder / current food"><span class="si" id="foodTypeIco">🌾</span><span class="sv"><span id="foodVal">0</span><span class="mut">/<span id="capVal">5</span></span></span></div>
       <div class="stat" title="Happy visits"><span class="si">💛</span><span class="sv" id="happyVal">0</span></div>
       <div class="stat" title="Species discovered"><span class="si">📖</span><span class="sv"><span id="discVal">0</span><span class="mut">/<span id="totalVal">0</span></span></span></div>
     </div>
   </header>
 
-  <!-- Top-right mini controls -->
+  <!-- World strip: season / time / weather / streak -->
+  <div id="worldStrip" class="panel">
+    <span class="ws" title="Season"><span id="seasonIco">☀️</span></span>
+    <span class="ws" title="Time of day"><span id="timeIco">☀️</span></span>
+    <span class="ws" title="Weather"><span id="weatherIco">☀️</span></span>
+    <span class="ws" title="Daily streak">🔥<b id="streakVal">0</b></span>
+  </div>
+
   <div id="miniControls">
     <button id="muteBtn" class="icon-btn" title="Toggle sound">🔊</button>
     <button id="resetBtn" class="icon-btn" title="Reset progress">↺</button>
   </div>
 
-  <!-- Toasts -->
   <div id="toasts"></div>
-
-  <!-- Ticker -->
+  <div id="frenzyBanner" class="hidden">🎉 Feeding Frenzy! &nbsp;×2 Points</div>
   <div id="ticker" class="panel">A gentle breeze drifts through the yard…</div>
+
+  <!-- Food selector -->
+  <div id="foodBar"></div>
 
   <!-- Bottom action bar -->
   <div id="actionBar">
     <button id="btnShop"  class="menu-btn"><span>🛠️</span>Shop</button>
-    <button id="scatterBtn" class="scatter-btn"><span class="scatter-ico">🌾</span>Scatter Seed<small>Space / click feeder</small></button>
+    <button id="btnGoals" class="menu-btn"><span>📋</span>Goals</button>
+    <button id="scatterBtn" class="scatter-btn"><span class="scatter-ico">🌾</span>Scatter<small>Space / click feeder</small></button>
     <button id="btnIndex" class="menu-btn"><span>📖</span>Birds</button>
     <button id="btnAreas" class="menu-btn"><span>🗺️</span>Areas</button>
+    <button id="btnMigrate" class="menu-btn"><span>🦅</span>Migrate</button>
   </div>
 
   <!-- ===== Overlay panels ===== -->
@@ -56,10 +63,20 @@
     </div>
   </div>
 
+  <div class="overlay hidden" id="overlayGoals">
+    <div class="sheet">
+      <div class="sheet-head"><h2>📋 Goals &amp; Achievements</h2><button class="sheet-close" data-close>✕</button></div>
+      <p class="sheet-intro">Your current objectives — always something to chase.</p>
+      <div id="questList" class="quest-list"></div>
+      <h3 class="sheet-sub">🏆 Achievements <small>(permanent point bonuses)</small></h3>
+      <div id="achList" class="ach-list"></div>
+    </div>
+  </div>
+
   <div class="overlay hidden" id="overlayIndex">
     <div class="sheet">
       <div class="sheet-head"><h2>📖 Bird Index</h2><button class="sheet-close" data-close>✕</button></div>
-      <p class="sheet-intro">Every species that has visited your feeder.</p>
+      <p class="sheet-intro">Every species that has visited your feeders.</p>
       <div id="indexGrid" class="index-grid"></div>
     </div>
   </div>
@@ -67,12 +84,22 @@
   <div class="overlay hidden" id="overlayAreas">
     <div class="sheet">
       <div class="sheet-head"><h2>🗺️ Areas</h2><button class="sheet-close" data-close>✕</button></div>
-      <p class="sheet-intro">New habitats to unlock as you grow.</p>
+      <p class="sheet-intro">Unlock new habitats, each with their own birds &amp; scenery.</p>
       <div id="areaList" class="area-list"></div>
     </div>
   </div>
 
-  <!-- Species card popup -->
+  <div class="overlay hidden" id="overlayMigrate">
+    <div class="sheet">
+      <div class="sheet-head"><h2>🦅 Migration</h2><button class="sheet-close" data-close>✕</button></div>
+      <div id="migrateInfo" class="migrate-info"></div>
+      <button id="migrateBtn" class="migrate-btn">🦅 Migrate</button>
+      <h3 class="sheet-sub">🪶 Permanent Boosts <small>(spend Feathers)</small></h3>
+      <div id="prestigeList" class="shop-list"></div>
+    </div>
+  </div>
+
+  <!-- Species card -->
   <div id="cardModal" class="overlay hidden">
     <div class="card-pop">
       <button class="sheet-close" id="cardClose">✕</button>
@@ -84,6 +111,7 @@
         <span>✨ <b id="cardPoints">0</b> pts</span>
         <span>👀 <b id="cardSeen">0</b>×</span>
       </div>
+      <div class="card-mastery" id="cardMastery"></div>
     </div>
   </div>
 

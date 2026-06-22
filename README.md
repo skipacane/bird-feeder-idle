@@ -37,6 +37,26 @@ earn is credited (and announced) when you return.
 | Automate the filling | Hire **Helpers** who top up the feeder for you — true idle play. |
 | Bird index / collection | Every new species to **arrive** is added to your illustrated index. |
 
+## 🪺 Depth & long-term play
+
+- **Goals & Achievements** — a quest ladder always shows your next objective, and
+  achievements grant permanent point bonuses.
+- **Four habitats** — Suburban Backyard, Whispering Woodland, Reedy Wetland and
+  Alpine Heights, each with their own **35 total** species and unique scenery.
+- **Food types** — Seed, Suet, Nyjer, Fruit and Nectar; each food attracts different
+  birds, so what you serve changes who visits.
+- **A living world** — a day/night cycle, four **seasons** (which change the scenery
+  and which birds appear), and **weather** (rain brings out the worm-lovers).
+- **Daily visitor & streaks** — a featured guest each real day, with a login-streak
+  Feather bonus.
+- **Golden visitors** — click the shimmering golden bird for a big payout.
+- **Hawk!** — a predator occasionally swoops in; click to shoo it before it scares
+  your birds off.
+- **Feeding frenzy** — keep birds happy in quick succession for a ×2 points burst.
+- **Migration (prestige)** — once you've built up a run, migrate to reset for
+  **Feathers**, a meta-currency that buys permanent boosts. Your collection,
+  achievements and Feathers carry over forever.
+
 ## 🐤 Starting area — *Suburban Backyard* (12 species)
 
 Common → Uncommon → Rare → Legendary, each with hand-tuned colors, markings and
