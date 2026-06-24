@@ -42,6 +42,10 @@ const Sprites = (() => {
     "8":["111","101","111","101","111"], "9":["111","101","111","001","111"],
     "+":["000","010","111","010","000"], "-":["000","000","111","000","000"],
     " ":["000","000","000","000","000"],
+    "F":["111","100","111","100","100"], "R":["111","101","111","110","101"],
+    "E":["111","100","111","100","111"], "S":["111","100","111","001","111"],
+    "H":["101","101","111","101","101"], "!":["010","010","010","000","010"],
+    ".":["000","000","000","000","010"], "*":["101","010","111","010","101"],
   };
   function pixelTextWidth(str,scale=1){ return str.length*4*scale - scale; }
   function pixelText(ctx,x,y,str,color,scale=1){
@@ -373,16 +377,30 @@ const Sprites = (() => {
     px(ctx,fx-1,ridgeY,2,3,ROOF_HI);              // ridge cap
   }
 
-  /* perch positions (feet points) */
-  function perchSlots(feeder){
-    const fx=feeder.x, ty=feeder.trayY;
-    return [
+  /* perch positions (feet points) — first 5 on/around the feeder, the rest
+     are ground-feeding spots used as the "Extra Perch" upgrade adds capacity */
+  function perchSlots(feeder, count){
+    const fx=feeder.x, ty=feeder.trayY, gc=L.groundContact;
+    const all=[
       { x:fx-17, y:ty,    facing: 1 },
       { x:fx+17, y:ty,    facing:-1 },
       { x:fx-25, y:ty-2,  facing: 1 },
       { x:fx+25, y:ty-2,  facing:-1 },
       { x:fx,    y:ty-35, facing: 1 },
+      { x:fx-43, y:gc-2,  facing: 1 },
+      { x:fx+43, y:gc-2,  facing:-1 },
+      { x:fx-60, y:gc-1,  facing: 1 },
+      { x:fx+60, y:gc-1,  facing:-1 },
+      { x:fx-32, y:gc-1,  facing: 1 },
+      { x:fx-78, y:gc,    facing: 1 },
+      { x:fx+78, y:gc,    facing:-1 },
+      { x:fx+32, y:gc-1,  facing:-1 },
+      { x:fx-95, y:gc+1,  facing: 1 },
+      { x:fx+95, y:gc+1,  facing:-1 },
+      { x:fx-112,y:gc+2,  facing: 1 },
+      { x:fx+112,y:gc+2,  facing:-1 },
     ];
+    return all.slice(0, Math.max(1, count||5));
   }
 
   /* ===========================================================
@@ -563,20 +581,234 @@ const Sprites = (() => {
   }
 
   /* ---- yard decorations (bought in the shop) ---- */
-  function drawDecor(ctx,type,x,y,level){
-    x=Math.round(x); y=Math.round(y);
+  function drawDecor(ctx,type,x,y,level,t){
+    x=Math.round(x); y=Math.round(y); t=t||0;
     if(type==="flowers"){
-      const cols=["#e8584f","#f0c419","#ffffff","#cf6fd0","#f08a3a"];
-      const n=4+level*2;
-      pell(ctx,x,y+3,16,4,"rgba(60,90,40,.30)");
-      for(let i=0;i<n;i++){ const fx=x-12+((i*7)%26), fy=y-4-((i*5)%8);
-        px(ctx,fx,fy+1,1,3,"#4e8a35"); dot(ctx,fx,fy,cols[i%cols.length]); dot(ctx,fx+1,fy,"#f7e9a0"); }
+      // a proper raised flower bed with wooden edging; density grows with level
+      const cols=[["#e8584f","#ff8a80"],["#f0c419","#ffe27a"],["#ffffff","#fff7d8"],
+                  ["#cf6fd0","#efa6ef"],["#f08a3a","#ffb877"],["#6db0ec","#aed6f7"]];
+      const halfW=24, soilTop=y, soilH=6;
+      pell(ctx,x,y+soilH+2,halfW+3,3,"rgba(40,30,18,.22)");                 // shadow
+      // soil
+      px(ctx,x-halfW,soilTop,halfW*2,soilH,"#5b3f27");
+      px(ctx,x-halfW,soilTop,halfW*2,2,"#6f4d30");
+      for(let i=0;i<10;i++) dot(ctx,x-halfW+3+((i*9)%(halfW*2-4)),soilTop+2+((i*5)%(soilH-2)),"#4a3220");
+      // wooden edging
+      px(ctx,x-halfW-2,soilTop-1,halfW*2+4,2,"#8a5f33");                    // front lip
+      px(ctx,x-halfW-2,soilTop-1,halfW*2+4,1,"#b07d44");
+      px(ctx,x-halfW-2,soilTop-1,2,soilH+2,"#8a5f33"); px(ctx,x+halfW,soilTop-1,2,soilH+2,"#8a5f33");
+      // flowers — rows of swaying blossoms
+      const n=5+level*3, span=halfW*2-8;
+      for(let i=0;i<n;i++){
+        const row=i%2, fx=x-halfW+5+Math.round((i/(n-1||1))*span);
+        const baseY=soilTop-1-row*3, h=6+((i*3)%4);
+        const sway=Math.round(Math.sin(t*1.7+i*1.3)*1.2);
+        const [pc,ph]=cols[i%cols.length];
+        px(ctx,fx,baseY-h,1,h,"#4e8a35");                                   // stem
+        dot(ctx,fx+ (i%2?1:-1),baseY-h+2,"#5fa83f");                        // leaf
+        const bx=fx+sway, by=baseY-h-2;
+        if(i%3===0){ // tulip-ish
+          px(ctx,bx-1,by,3,3,pc); dot(ctx,bx,by-1,pc); dot(ctx,bx,by,ph);
+        } else {     // round bloom
+          dot(ctx,bx,by-1,pc); dot(ctx,bx-1,by,pc); dot(ctx,bx+1,by,pc); dot(ctx,bx,by+1,pc);
+          dot(ctx,bx,by,"#f7e9a0");
+        }
+      }
     } else if(type==="birdbath"){
+      const st="#b8b2a4", stHi="#d8d3c7", stDk="#8c867a";
+      const water="#a9def0", waterHi="#e3f5fb", waterDk="#74c2dc";
+      pell(ctx,x,y+4,13,3,"rgba(40,30,18,.25)");                           // ground shadow
+      // base foot
+      pell(ctx,x,y+2,9,3,stDk); pell(ctx,x,y+1,8,2,st); pell(ctx,x,y,7,2,stHi);
+      // pedestal column
+      px(ctx,x-3,y-12,6,14,st); px(ctx,x-3,y-12,2,14,stHi); px(ctx,x+2,y-12,1,14,stDk);
+      px(ctx,x-4,y-7,8,2,stDk); px(ctx,x-4,y-7,8,1,st);                    // collar band
+      // bowl exterior
+      pell(ctx,x,y-13,12,4,stDk); pell(ctx,x,y-14,12,4,st); pell(ctx,x,y-15,13,3,stHi);
+      // water basin
+      pell(ctx,x,y-16,10,3,water); pell(ctx,x,y-17,9,2,waterDk); pell(ctx,x,y-17,9,1,water);
+      // animated ripple + sparkle
+      const k=(Math.sin(t*1.8)*0.5+0.5), rw=Math.round(2+k*6);
+      ctx.globalAlpha=0.75*(1-k);
+      ctx.fillStyle=waterHi; ctx.fillRect(x-rw,y-17,2,1); ctx.fillRect(x+rw-1,y-17,2,1);
+      ctx.globalAlpha=1;
+      dot(ctx,x-3,y-17,waterHi); dot(ctx,x+4,y-16,waterHi);
+    } else if(type==="platform"){
+      const W="#a4764b", WD="#75502f", WH="#c59a66";
+      pell(ctx,x,y+3,16,3,"rgba(40,30,18,.25)");                           // shadow
+      px(ctx,x-13,y-1,3,7,WD); px(ctx,x+10,y-1,3,7,WD);                    // legs
+      px(ctx,x-15,y-5,30,4,WD); px(ctx,x-14,y-5,28,3,W); px(ctx,x-14,y-5,28,1,WH);  // tray
+      for(let i=0;i<7;i++) dot(ctx,x-11+i*3,y-6,i%2?"#e0bd74":"#caa15c"); // seed mound
+      px(ctx,x-14,y-2,28,1,WD);
+    } else if(type==="peanut_post"){
+      pell(ctx,x,y+3,7,2,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-26,3,28,"#8a5f33"); px(ctx,x-1,y-26,1,28,"#b07d44");    // post
+      px(ctx,x-4,y-26,9,2,"#6e4a28");                                      // cap
+      const pn="#cda572", pnd="#a8814f";
+      for(let i=0;i<6;i++){ const yy=y-23+i*4, sx=x+(i%2?2:-4);           // peanuts on a string
+        pell(ctx,sx,yy,2,1,pn); pell(ctx,sx,yy+1,2,1,pn); dot(ctx,sx,yy,pnd); dot(ctx,sx+1,yy+1,pnd); }
+    } else if(type==="fruit_tree"){
+      pell(ctx,x,y+4,12,3,"rgba(40,30,18,.25)");
+      px(ctx,x-2,y-20,4,22,"#7c5a36"); px(ctx,x-2,y-20,1,22,"#9a7547"); px(ctx,x+1,y-20,1,22,"#5e4327"); // trunk
+      px(ctx,x-6,y-12,4,2,"#7c5a36"); px(ctx,x+2,y-14,4,2,"#7c5a36");     // little branches
+      pell(ctx,x,y-27,15,11,"#2f6e2c"); pell(ctx,x-7,y-23,9,7,"#54a344");
+      pell(ctx,x+7,y-24,8,6,"#54a344"); pell(ctx,x,y-30,13,7,"#7cc657");  // canopy
+      for(const [dx,dy] of [[-7,-25],[5,-27],[-2,-21],[9,-22],[1,-31],[-9,-28],[6,-31]]){
+        dot(ctx,x+dx,y+dy,"#c23026"); dot(ctx,x+dx,y+dy-1,"#e8584f"); }
+    } else if(type==="owldecoy"){          // Owl Decoy upgrade
+      pell(ctx,x,y+3,6,2,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-15,3,17,"#8a5f33"); px(ctx,x-1,y-15,1,17,"#b07d44");      // post
+      px(ctx,x-3,y-16,7,1,"#6e4a28");                                       // cap
+      const o="#7d5a38", ol="#9c7547", e="#f6d24a";
+      pell(ctx,x,y-21,5,5,o); pell(ctx,x,y-22,4,4,ol);                      // body/head
+      px(ctx,x-4,y-26,2,2,o); px(ctx,x+3,y-26,2,2,o);                       // ear tufts
+      px(ctx,x-3,y-23,2,2,e); px(ctx,x+2,y-23,2,2,e);                       // eyes
+      dot(ctx,x-2,y-23,"#2a2018"); dot(ctx,x+2,y-23,"#2a2018");             // pupils
+      dot(ctx,x,y-20,"#d8843a");                                           // beak
+    } else if(type==="gnome"){             // Hire a Helper (caretaker)
+      pell(ctx,x,y+2,5,2,"rgba(40,30,18,.25)");
+      px(ctx,x-3,y-7,6,7,"#4f7bb0"); px(ctx,x-3,y-7,2,7,"#6a96cb");         // blue coat
+      px(ctx,x-2,y-2,5,2,"#5e4327");                                        // boots
+      pell(ctx,x,y-10,3,2,"#f0cba0");                                       // face
+      px(ctx,x-2,y-9,4,2,"#ece6da");                                        // white beard
+      dot(ctx,x-1,y-10,"#2a2018"); dot(ctx,x+1,y-10,"#2a2018");             // eyes
+      px(ctx,x-3,y-12,6,1,"#c23026"); px(ctx,x-2,y-14,4,1,"#c23026"); px(ctx,x-1,y-16,2,1,"#c23026"); dot(ctx,x,y-17,"#c23026"); // pointy hat
+    } else if(type==="berrybush"){         // Berry Bushes (rarity), scales with level
+      const lv=Math.max(1,level||1);
+      pell(ctx,x,y+3,12,3,"rgba(40,30,18,.25)");
+      pell(ctx,x,y-6,12,7,"#2f6e2c"); pell(ctx,x-5,y-4,7,5,"#4e9442"); pell(ctx,x+5,y-5,6,4,"#4e9442"); pell(ctx,x,y-10,10,5,"#63b057");
+      let s=991; const n=4+lv*2;
+      for(let i=0;i<n;i++){ s=(s*1103515245+12345)&0x7fffffff; const bx=x-9+(s>>6)%19; s=(s*1103515245+12345)&0x7fffffff; const by=y-11+(s>>6)%9;
+        dot(ctx,bx,by,"#3a4fc4"); dot(ctx,bx,by-1,"#6a7ce0"); }
+    } else if(type==="sign"){              // Welcome Sign (frenzy)
+      pell(ctx,x,y+3,7,2,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-15,3,17,"#8a5f33"); px(ctx,x-1,y-15,1,17,"#b07d44");     // post
+      px(ctx,x-10,y-23,20,9,"#caa15c"); px(ctx,x-10,y-23,20,1,"#e0bd74"); px(ctx,x-10,y-15,20,1,"#9c7636"); // board
+      px(ctx,x-10,y-23,1,9,"#8a6740"); px(ctx,x+9,y-23,1,9,"#8a6740");      // frame
+      const r="#c8473a"; dot(ctx,x-2,y-21,r); dot(ctx,x+1,y-21,r); px(ctx,x-3,y-20,6,1,r); px(ctx,x-2,y-19,4,1,r); px(ctx,x-1,y-18,2,1,r); // heart
+    } else if(type==="perchpole"){         // Extra Perch (perches)
+      pell(ctx,x,y+3,4,2,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-19,2,21,"#9aa0a6"); px(ctx,x-1,y-19,1,21,"#c2c6cc");     // metal pole
+      px(ctx,x-6,y-19,13,2,"#8a5f33"); px(ctx,x-6,y-19,13,1,"#b07d44");     // wooden cross-perch
+      dot(ctx,x+6,y-21,"#5fa83f"); dot(ctx,x-6,y-20,"#5fa83f");             // leaves
+    } else if(type==="berry_thicket"){     // Woodland — Scarlet Tanager
+      pell(ctx,x,y+3,13,3,"rgba(40,30,18,.25)");
+      pell(ctx,x,y-6,13,8,"#2c5e2a"); pell(ctx,x-6,y-4,8,5,"#3f7a3a"); pell(ctx,x+6,y-5,7,5,"#3f7a3a"); pell(ctx,x,y-12,11,6,"#4e8a44");
+      let s=331; for(let i=0;i<11;i++){ s=(s*1103515245+12345)&0x7fffffff; const bx=x-9+(s>>6)%19; s=(s*1103515245+12345)&0x7fffffff; const by=y-13+(s>>6)%11;
+        dot(ctx,bx,by,"#5a1a3a"); dot(ctx,bx,by-1,"#8a2a52"); }
+    } else if(type==="suet_log"){          // Woodland — Pileated Woodpecker
+      pell(ctx,x,y+3,6,2,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-18,3,20,"#7c5a36"); px(ctx,x-1,y-18,1,20,"#9a7547");      // post
+      px(ctx,x-5,y-23,11,7,"#8a6740"); px(ctx,x-5,y-23,11,1,"#a3804f"); px(ctx,x-5,y-17,11,1,"#5e4327"); // log
+      pell(ctx,x-5,y-20,2,3,"#6e4a28"); pell(ctx,x+5,y-20,2,3,"#6e4a28");    // ends
+      for(const [dx,dy] of [[-1,-21],[2,-19],[-3,-19]]) px(ctx,x+dx,y+dy,2,2,"#e7c878"); // suet plugs
+    } else if(type==="oriole_feeder"){     // Woodland — Baltimore Oriole
+      pell(ctx,x,y+3,6,2,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-20,3,22,"#8a5f33"); px(ctx,x-1,y-20,1,22,"#b07d44");      // post
+      px(ctx,x-7,y-20,15,2,"#6e4a28");                                       // crossbar
+      pell(ctx,x-6,y-16,3,3,"#e8772a"); pell(ctx,x-6,y-16,3,2,"#f0902f"); dot(ctx,x-6,y-16,"#fff0d0"); // orange half
+      px(ctx,x+4,y-17,3,3,"#bfe6f2"); px(ctx,x+4,y-17,3,1,"#f4c84a");        // nectar cup
+    } else if(type==="fishing_perch"){     // Wetland — Belted Kingfisher
+      pell(ctx,x,y+1,11,3,"#7fb8d0"); pell(ctx,x,y,9,2,"#a9def0"); dot(ctx,x-3,y,"#e3f5fb"); // water
+      px(ctx,x-1,y-21,3,19,"#8a5f33"); px(ctx,x-1,y-21,1,19,"#b07d44");      // post
+      for(let i=0;i<9;i++) px(ctx,x+1+i,y-21+Math.round(i*0.55),1,1,"#7c5a36"); // branch
+      dot(ctx,x+9,y-16,"#5fa83f");
+    } else if(type==="reed_pool"){         // Wetland — Great Blue Heron
+      pell(ctx,x,y+2,15,4,"rgba(40,30,18,.2)");
+      pell(ctx,x,y-1,14,4,"#5f9ec4"); pell(ctx,x,y-2,12,3,"#a9def0"); dot(ctx,x-4,y-2,"#e3f5fb"); dot(ctx,x+4,y-1,"#e3f5fb"); // water
+      for(const dx of [-10,-6,7,11]){ px(ctx,x+dx,y-15,1,14,"#5e7a3a"); px(ctx,x+dx-1,y-17,3,3,"#7c5a36"); } // cattails
+    } else if(type==="pine_bough"){        // Alpine — Pine Grosbeak
+      pell(ctx,x,y+3,9,3,"rgba(40,30,18,.25)");
+      px(ctx,x-1,y-6,3,8,"#5e4327");                                         // trunk
+      pell(ctx,x,y-8,10,4,"#2c5a32"); pell(ctx,x,y-13,8,4,"#357a3c"); pell(ctx,x,y-18,6,4,"#357a3c"); pell(ctx,x,y-22,4,3,"#4e9442");
+      dot(ctx,x-4,y-9,"#7c5a36"); dot(ctx,x+4,y-12,"#7c5a36"); dot(ctx,x-2,y-16,"#c0566a"); // cones + a grosbeak-red dot
+    } else if(type==="cliff_patch"){       // Alpine — Rosy-Finch
+      pell(ctx,x,y+3,12,3,"rgba(40,30,18,.25)");
+      pell(ctx,x,y-4,11,6,"#8c867a"); pell(ctx,x-3,y-6,6,4,"#a39d8f"); pell(ctx,x+4,y-4,5,3,"#7a7468"); // rock
+      px(ctx,x-10,y-1,20,2,"#e8eef2");                                       // snow base
+      for(const [dx,dy] of [[-4,-8],[0,-9],[3,-8],[-1,-7]]) dot(ctx,x+dx,y+dy,"#caa15c"); // seed
+    } else if(type==="eagle_eyrie"){       // Alpine — Golden Eagle
       pell(ctx,x,y+4,10,3,"rgba(40,30,18,.25)");
-      px(ctx,x-1,y-6,4,10,"#aaa396"); px(ctx,x-1,y-6,1,10,"#c6c1b5");   // pedestal
-      pell(ctx,x+1,y-8,9,4,"#8f8a7e"); pell(ctx,x+1,y-9,7,3,"#bfe6f2"); // basin + water
-      dot(ctx,x-1,y-9,"#ffffff");
+      px(ctx,x-4,y-25,9,27,"#8c867a"); px(ctx,x-4,y-25,3,27,"#a39d8f"); px(ctx,x+3,y-25,2,27,"#6e685c"); // crag
+      px(ctx,x-4,y-25,2,2,"#7a7468"); px(ctx,x+2,y-23,3,2,"#7a7468");        // jagged
+      pell(ctx,x,y-27,7,3,"#8a6740"); pell(ctx,x,y-28,6,2,"#5e4327"); dot(ctx,x,y-29,"#e8e0d2"); // stick nest + egg
+      px(ctx,x-8,y-1,18,2,"#e8eef2");                                        // snow base
     }
+  }
+  /* draw a decoration scaled (for depth) while keeping pixels crisp: render to an
+     offscreen buffer at native size, then blit it back with nearest-neighbour */
+  let _decorBuf=null, _decorCtx=null; const _DBW=104, _DBH=104, _DAX=52, _DAY=80;
+  function drawDecorScaled(ctx, type, x, y, level, t, scale){
+    scale = scale || 1;
+    if(scale===1 || typeof document==="undefined"){ drawDecor(ctx,type,x,y,level,t); return; }
+    if(!_decorBuf){ _decorBuf=document.createElement("canvas"); _decorBuf.width=_DBW; _decorBuf.height=_DBH; _decorCtx=_decorBuf.getContext("2d"); _decorCtx.imageSmoothingEnabled=false; }
+    _decorCtx.clearRect(0,0,_DBW,_DBH);
+    drawDecor(_decorCtx, type, _DAX, _DAY, level, t);
+    const prev=ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(_decorBuf, Math.round(x-_DAX*scale), Math.round(y-_DAY*scale), Math.round(_DBW*scale), Math.round(_DBH*scale));
+    ctx.imageSmoothingEnabled=prev;
+  }
+
+  /* ---- "tap me" hint drawn above the feeder when it wants attention ---- */
+  function ringEllipse(ctx,cx,cy,rx,ry,color){
+    ctx.fillStyle=color; const steps=22;
+    for(let i=0;i<steps;i++){ const a=i/steps*Math.PI*2;
+      ctx.fillRect(Math.round(cx+Math.cos(a)*rx), Math.round(cy+Math.sin(a)*ry), 1, 1); }
+  }
+  function drawTapHint(ctx,x,y,t,strong){
+    const bob=Math.round(Math.sin(t*4.5)*2.2);
+    const fill = strong?"#ffd54a":"#ffe9a8", out="#5a3a18";
+    // pulsing halo ring around the tray
+    const k=(Math.sin(t*3)*0.5+0.5);
+    ctx.globalAlpha=(strong?0.55:0.32)*(0.4+0.6*(1-k));
+    ringEllipse(ctx,x,y+3,16+k*6,7+k*2, strong?"#ffe06a":"#ffffff");
+    ctx.globalAlpha=1;
+    // downward arrow floating above the tray
+    const top=y-30+bob, ax=x;
+    px(ctx,ax-2,top-1,5,8,out); px(ctx,ax-1,top,3,7,fill);                 // shaft
+    for(let r=0;r<5;r++){ const half=4-r; px(ctx,ax-half-1,top+7+r,(half+1)*2+1,1,out); } // head outline
+    for(let r=0;r<4;r++){ const half=3-r; px(ctx,ax-half,top+8+r,half*2+1,1,fill); }       // head fill
+  }
+
+  /* ---- ongoing "fresh seed" aura around the feeder while a Scatter buff is live ---- */
+  function drawScatterAura(ctx,x,y,t,s){
+    if(s<=0.02) return;
+    const cy=y-26, pulse=Math.sin(t*3)*0.5+0.5;
+    // glowing halo rings (brightness/size scale with buff strength)
+    ctx.globalAlpha=0.22*s*(0.7+0.3*pulse);
+    ringEllipse(ctx,x,cy,18+pulse*4, 11+pulse*3, "#bfeaf2");
+    ctx.globalAlpha=0.15*s;
+    ringEllipse(ctx,x,cy,27, 17, "#ffffff");
+    // rising sparkle motes
+    const n=Math.round(3+s*6);
+    for(let i=0;i<n;i++){
+      const ph=t*0.7 + i*0.93, life=ph-Math.floor(ph);
+      const mx=x + Math.sin(i*2.3+Math.floor(ph))*(8+i*2.2);
+      const my=y-6 - life*36, a=(1-life)*Math.min(1,s*1.3);
+      if(a<=0.05) continue;
+      ctx.globalAlpha=a; ctx.fillStyle=(i%2)?"#fff4b0":"#bfeaf2";
+      const sz=a>0.6?2:1; ctx.fillRect(Math.round(mx),Math.round(my),sz,sz);
+    }
+    ctx.globalAlpha=1;
+  }
+  /* ---- dramatic burst when a rare/legendary bird arrives (p = 0..1) ---- */
+  function drawArrivalBurst(ctx,x,y,p,color,leg){
+    x=Math.round(x); y=Math.round(y); const a=1-p, R=p*(leg?64:40);
+    if(p<0.3){ ctx.globalAlpha=(0.3-p)*3.2; pell(ctx,x,y,leg?13:8,leg?9:6,"#fffbe0"); }
+    ctx.globalAlpha=a*0.9; ringEllipse(ctx,x,y,4+R,(4+R)*0.7,color);
+    ctx.globalAlpha=a*0.55; ringEllipse(ctx,x,y,2+R*0.6,(2+R*0.6)*0.7,"#ffffff");
+    if(leg){ ctx.globalAlpha=a*0.8; ctx.fillStyle=color;          // radiating spokes
+      for(let i=0;i<10;i++){ const ang=i/10*Math.PI*2 + p*1.6;
+        ctx.fillRect(Math.round(x+Math.cos(ang)*R), Math.round(y+Math.sin(ang)*R*0.7), 2,2); } }
+    ctx.globalAlpha=1;
+  }
+  /* ---- one-shot burst the moment you Scatter (p = 0..1 progress) ---- */
+  function drawScatterBurst(ctx,x,y,p){
+    const cy=y-24, a=1-p;
+    if(p<0.22){ ctx.globalAlpha=(0.22-p)*4.5; pell(ctx,x,cy,11,7,"#fffbe0"); ctx.globalAlpha=1; }
+    ctx.globalAlpha=a*0.85; ringEllipse(ctx,x,cy,4+p*44, (4+p*44)*0.6, "#ffffff");
+    ctx.globalAlpha=a*0.6;  ringEllipse(ctx,x,cy,2+p*30, (2+p*30)*0.42, "#bfeaf2");
+    ctx.globalAlpha=1;
   }
 
   /* ---- hawk (predator event) ---- */
@@ -593,8 +825,149 @@ const Sprites = (() => {
     pell(ctx,x+dir*10,y-up,10,3,out); pell(ctx,x+dir*10,y-up,9,2,wing);// near wing
   }
 
-  return { L, drawBackground, drawFeeder, drawBird, drawPortrait, drawDecor, drawHawk,
-           perchSlots, standHeight, pixelText, pixelTextWidth, shade };
+  /* ===========================================================
+     PIXEL ICONS  (drawn in a 16x16 cell; used across the UI in
+     place of emoji so everything matches the game's art)
+     =========================================================== */
+  function drawIcon(ctx, name, ox, oy){
+    ox=Math.round(ox||0); oy=Math.round(oy||0);
+    const P=(x,y,w,h,c)=>{ ctx.fillStyle=c; ctx.fillRect(ox+x,oy+y,w,h); };
+    const D=(x,y,c)=>{ ctx.fillStyle=c; ctx.fillRect(ox+x,oy+y,1,1); };
+    const E=(cx,cy,rx,ry,c)=>pell(ctx,ox+cx,oy+cy,rx,ry,c);
+    switch(name){
+      case "star": {
+        const g="#efb21c", gl="#ffe27a";
+        P(7,2,2,12,g); P(2,7,12,2,g);
+        D(7,1,g);D(8,1,g);D(7,14,g);D(8,14,g);D(1,7,g);D(1,8,g);D(14,7,g);D(14,8,g);
+        P(6,6,4,4,gl); D(3,3,gl);D(12,12,gl);D(12,3,gl);D(3,12,gl); break; }
+      case "feather": {
+        const fb="#7fa9cf", fl="#cfe2f0", sh="#f4f0e6";
+        for(let i=0;i<12;i++){ const cx=11-i*0.55, w=Math.round(Math.sin(i/12*Math.PI)*4);
+          P(Math.round(cx-w), 2+i, w+1, 1, i<2?fl:fb); D(Math.round(cx), 2+i, sh); }
+        D(4,13,sh); D(3,14,sh); break; }
+      case "seed": {
+        const s="#caa15c", sd="#9c7636", sl="#e0bd74";
+        E(5,7,2,3,s); E(10,9,2,3,s); E(8,5,2,3,s);
+        D(5,6,sl);D(10,8,sl);D(8,4,sl); D(5,9,sd);D(10,11,sd);D(8,7,sd); break; }
+      case "safflower": {
+        const s="#ece5d2", sd="#c8bda0", sl="#fbf6e8";
+        E(5,7,2,3,s); E(10,9,2,3,s); E(8,5,2,3,s);
+        D(5,6,sl);D(10,8,sl);D(8,4,sl); D(5,9,sd);D(10,11,sd);D(8,7,sd); break; }
+      case "peanut": {
+        const p="#cda572", pd="#a8814f", ph="#e6c993";
+        E(6,6,2,3,p); E(9,10,2,3,p); P(7,8,2,2,p);
+        D(6,4,ph);D(9,8,ph); D(6,7,pd);D(9,12,pd); D(7,9,pd); break; }
+      case "mealworm": {
+        const m="#cda572", md="#a8814f", mh="#e6c993";
+        for(let i=0;i<6;i++){ const wx=4+i*1.6, wy=9-Math.round(Math.sin(i*0.95)*2.2);
+          E(wx,wy,1,2,m); D(wx,wy-1,mh); D(wx,wy+1,md); }
+        D(13,7,"#3a2c1c"); break; }   // head
+      case "suet": {
+        P(3,5,10,7,"#e7c878"); P(3,5,10,1,"#f2dc9a"); P(3,11,10,1,"#c9a458");
+        for(let y=6;y<11;y+=2) for(let x=4;x<12;x+=2) D(x,y,"#caa253"); break; }
+      case "nyjer": {
+        const s="#3a3026"; for(const[x,y]of[[5,5],[8,6],[6,8],[9,9],[7,11],[10,7],[4,9]]){ P(x,y,1,2,s); D(x,y,"#5a4a36"); } break; }
+      case "fruit": {
+        E(7,9,4,4,"#d6473a"); E(7,9,4,4-1,"#e8584f"); D(6,7,"#f2a6a0");
+        P(8,3,1,4,"#5e4327"); D(9,3,"#5aa344"); D(10,2,"#7cc657"); break; }
+      case "nectar": {
+        P(5,4,6,2,"#d8c89a"); P(6,6,4,7,"#bfe6f2"); P(6,6,4,3,"#f4c84a"); P(6,6,1,7,"#ffffff"); break; }
+      case "heart": {
+        const r="#d8485c", rl="#ef7d8e"; const g=["01010","11111","11111","01110","00100"];
+        for(let y=0;y<5;y++)for(let x=0;x<5;x++) if(g[y][x]==="1") P(5+x,5+y,1,1, y<2&&x<2?rl:r); break; }
+      case "book": {
+        P(3,3,10,11,"#8a5a3c"); P(4,3,9,11,"#a8704a"); P(7,3,1,11,"#5e3a24");
+        P(8,4,4,2,"#f2efe6"); P(8,7,4,1,"#e8e0d2"); P(8,9,3,1,"#e8e0d2");
+        E(5,7,1,2,"#d6473a"); break; }   // little red bird mark
+      case "wrench": {
+        const m="#aab0b6", md="#7a808a", h="#cfd4da";
+        for(let i=0;i<8;i++){ D(5+i,10-i,m); D(6+i,10-i,md); }
+        P(3,3,4,4,m); D(5,5,"#e9e1cf"); P(10,9,4,4,m); D(11,11,h); break; }
+      case "scroll": {
+        P(4,3,8,10,"#f1e6c6"); P(4,3,8,1,"#d8c79a"); P(4,12,8,1,"#d8c79a");
+        P(6,6,4,1,"#9a7a4c"); P(6,8,5,1,"#9a7a4c"); P(6,10,3,1,"#9a7a4c");
+        D(5,5,"#5aa344"); break; }
+      case "map": {
+        P(3,4,10,9,"#e7dcb6"); P(3,4,3,9,"#cdbf94"); P(9,4,1,9,"#cdbf94");
+        for(let i=0;i<7;i++) D(4+i,11-i,"#b08a4a"); E(11,6,1,1,"#d6473a"); break; }
+      case "bird": {   // migrate / flight
+        const b="#5b6b7a"; E(7,8,4,3,b); E(10,7,2,2,b); P(11,7,2,1,"#e0b23a");
+        P(2,5,5,1,b); P(3,4,3,1,b); P(11,5,3,1,b); P(11,4,2,1,b); D(9,7,"#fff"); break; }
+      case "leaf": {
+        const a="#c8842f", b="#a85f24"; E(8,8,4,5,a); P(8,4,1,9,b);
+        D(6,7,"#e3ab3c");D(7,6,"#e3ab3c"); break; }
+      case "flower": {
+        const p="#ef8fb0"; D(8,5,p);D(8,9,p);D(6,7,p);D(10,7,p); P(7,6,3,3,p); D(8,7,"#f4c84a");
+        P(8,9,1,4,"#5aa344"); break; }
+      case "sun": {
+        E(8,8,3,3,"#ffe27a"); E(8,8,2,2,"#fff3c2");
+        for(const[x,y]of[[8,2],[8,13],[2,8],[13,8],[4,4],[12,4],[4,12],[12,12]]) D(x,y,"#f4c84a"); break; }
+      case "moon": {
+        E(8,8,5,5,"#f3efce"); E(10,7,4,4,"#cfe2f0"); D(5,6,"#fff"); break; }
+      case "cloud": {
+        E(6,8,3,2,"#e6ecf0"); E(10,8,3,3,"#f2f5f7"); E(8,7,3,2,"#ffffff"); P(4,9,9,2,"#d6dee4"); break; }
+      case "rain": {
+        E(6,6,3,2,"#cdd6dc"); E(10,6,3,2,"#dde3e8"); P(4,7,9,2,"#bcc6cd");
+        for(const x of [5,8,11]){ D(x,10,"#7fb2cb"); D(x,12,"#7fb2cb"); } break; }
+      case "snow": {
+        const c="#cfe2f0"; P(7,3,2,10,c); P(3,7,10,2,c);
+        D(5,5,c);D(11,5,c);D(5,11,c);D(11,11,c); D(7,7,"#ffffff"); break; }
+      case "flame": {
+        P(7,4,2,9,"#e8772a"); E(8,9,3,4,"#f0a030"); E(8,11,2,2,"#f4c84a"); D(8,6,"#ffe06a"); break; }
+      case "drop": {   // fresh seed / fill
+        E(8,9,4,4,"#5fa8c4"); E(8,9,3,4,"#8fd0e2"); P(7,3,2,5,"#8fd0e2"); D(7,8,"#ffffff"); D(8,4,"#d4f0f8"); break; }
+      case "speaker": {
+        P(3,6,3,4,"#7a808a"); P(6,4,2,8,"#9aa0a6"); P(5,5,1,6,"#9aa0a6");
+        D(10,6,"#5aa344");D(11,7,"#5aa344");D(11,8,"#5aa344");D(10,9,"#5aa344"); break; }
+      case "mute": {
+        P(3,6,3,4,"#7a808a"); P(6,4,2,8,"#9aa0a6"); P(5,5,1,6,"#9aa0a6");
+        D(10,6,"#d6473a");D(13,6,"#d6473a");D(11,7,"#d6473a");D(12,7,"#d6473a");D(11,8,"#d6473a");D(12,8,"#d6473a");D(10,9,"#d6473a");D(13,9,"#d6473a"); break; }
+      case "reset": {
+        const c="#8a6740"; E(8,8,5,5,c); E(8,8,3,3,"#f6e9cf");
+        P(11,3,3,1,c); P(13,3,1,4,c); D(11,4,c);D(12,5,c); break; }
+      case "gear": {
+        const m="#9aa0a6"; E(8,8,5,5,m); E(8,8,2,2,"#f6e9cf");
+        for(const[x,y]of[[8,2],[8,13],[2,8],[13,8],[4,4],[12,12],[12,4],[4,12]]) D(x,y,"#7a808a"); break; }
+      case "pin": {
+        E(8,6,3,3,"#d6473a"); E(8,6,2,2,"#f2efe6"); P(7,8,2,5,"#b03a30"); break; }
+      case "tray": {
+        P(2,9,12,4,"#8a6740"); P(2,9,12,1,"#a3804f"); P(2,12,12,1,"#5e4327");
+        P(4,7,8,2,"#caa15c"); D(5,6,"#e0bd74");D(8,6,"#e0bd74");D(10,7,"#e0bd74"); break; }
+      case "can": {
+        P(4,6,6,7,"#9aa0a6"); P(4,6,6,1,"#c6ccd2"); P(4,12,6,1,"#7a808a");
+        P(3,7,1,4,"#7a808a"); P(9,5,3,1,"#9aa0a6"); P(11,3,1,3,"#9aa0a6");
+        D(12,7,"#8fd0e2");D(13,9,"#8fd0e2");D(12,10,"#8fd0e2"); break; }
+      case "scoop": {
+        P(4,6,6,5,"#cdd2d8"); P(4,6,6,1,"#e9edf1"); P(4,10,6,1,"#a8aeb6");
+        P(9,5,4,2,"#9aa0a6"); D(13,5,"#7a808a"); break; }
+      case "perch": {   // a little bird sitting on a branch (Extra Perch)
+        const w="#8a5f33", wl="#b07d44", b="#6da0d6", bl="#a6cdec";
+        P(2,11,12,2,w); P(2,11,12,1,wl);                    // branch
+        D(4,10,"#5fa83f"); D(12,9,"#5fa83f");               // leaves
+        E(8,7,3,3,b); E(8,6,3,2,bl); P(10,6,2,1,"#e0b23a"); // body + beak
+        D(7,6,"#2a2018"); P(7,11,1,1,w); P(9,11,1,1,w); break; }
+      case "owl": {     // owl decoy (Owl Decoy)
+        const o="#7d5a38", ol="#9c7547", e="#f6d24a";
+        P(4,3,3,2,o); P(9,3,3,2,o);                         // ear tufts
+        E(8,9,5,5,o); E(8,8,4,4,ol);                        // round head/body
+        E(6,7,2,2,e); E(10,7,2,2,e);                        // big eyes
+        D(6,7,"#2a2018"); D(10,7,"#2a2018");                // pupils
+        D(8,8,"#d8843a"); D(8,9,"#c2752f"); break; }        // beak
+      default: P(4,4,8,8,"#c0563f");
+    }
+  }
+  /* render an icon onto its own (CSS-upscaled) canvas */
+  function iconCanvas(name, cssSize){
+    if(typeof document==="undefined") return null;
+    const c=document.createElement("canvas"); c.width=16; c.height=16;
+    c.className="icon"; if(cssSize){ c.style.width=cssSize+"px"; c.style.height=cssSize+"px"; }
+    const x=c.getContext("2d"); x.imageSmoothingEnabled=false; drawIcon(x,name,0,0);
+    return c;
+  }
+
+  return { L, drawBackground, drawFeeder, drawBird, drawPortrait, drawDecor, drawDecorScaled, drawTapHint,
+           drawScatterAura, drawScatterBurst, drawArrivalBurst, drawHawk,
+           drawIcon, iconCanvas, perchSlots, standHeight, pixelText, pixelTextWidth, shade };
 })();
 
 window.Sprites = Sprites;

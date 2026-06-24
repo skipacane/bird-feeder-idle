@@ -9,92 +9,108 @@
 <body>
   <canvas id="game" width="480" height="270"></canvas>
 
-  <!-- Floating HUD -->
+  <!-- Compact HUD -->
   <header id="hud" class="panel">
     <div class="hud-title">
-      <span class="logo">🐦</span>
       <div><b>Backyard Birds</b><span class="area-name" id="areaName">Suburban Backyard</span></div>
     </div>
     <div class="stats">
-      <div class="stat" title="Bird Points"><span class="si">✨</span><span class="sv" id="pointsVal">0</span></div>
-      <div class="stat" title="Feathers (prestige currency)"><span class="si">🪶</span><span class="sv" id="featherVal">0</span></div>
-      <div class="stat" title="Seed in feeder / current food"><span class="si" id="foodTypeIco">🌾</span><span class="sv"><span id="foodVal">0</span><span class="mut">/<span id="capVal">5</span></span></span></div>
-      <div class="stat" title="Happy visits"><span class="si">💛</span><span class="sv" id="happyVal">0</span></div>
-      <div class="stat" title="Species discovered"><span class="si">📖</span><span class="sv"><span id="discVal">0</span><span class="mut">/<span id="totalVal">0</span></span></span></div>
+      <div class="stat" title="Bird Points"><span class="si" data-ic="star" data-icsize="15"></span><span class="sv" id="pointsVal">0</span><span class="mult-badge hidden" id="pointsMult" title="Active points multiplier"></span></div>
+      <div class="stat" title="Feathers"><span class="si" data-ic="feather" data-icsize="15"></span><span class="sv" id="featherVal">0</span></div>
+      <div class="stat" title="Species discovered"><span class="si" data-ic="book" data-icsize="15"></span><span class="sv"><span id="discVal">0</span><span class="mut">/<span id="totalVal">0</span></span></span></div>
     </div>
   </header>
 
   <!-- World strip: season / time / weather / streak -->
   <div id="worldStrip" class="panel">
-    <span class="ws" title="Season"><span id="seasonIco">☀️</span></span>
-    <span class="ws" title="Time of day"><span id="timeIco">☀️</span></span>
-    <span class="ws" title="Weather"><span id="weatherIco">☀️</span></span>
-    <span class="ws" title="Daily streak">🔥<b id="streakVal">0</b></span>
-  </div>
-
-  <div id="miniControls">
-    <button id="muteBtn" class="icon-btn" title="Toggle sound">🔊</button>
-    <button id="resetBtn" class="icon-btn" title="Reset progress">↺</button>
+    <span class="ws" id="seasonIco" title="Season"></span>
+    <span class="ws" id="timeIco" title="Time of day"></span>
+    <span class="ws" id="weatherIco" title="Weather"></span>
+    <span class="ws" title="Daily streak"><span data-ic="flame" data-icsize="20"></span><b id="streakVal">0</b></span>
   </div>
 
   <div id="toasts"></div>
-  <div id="frenzyBanner" class="hidden">🎉 Feeding Frenzy! &nbsp;×2 Points</div>
-  <div id="ticker" class="panel">A gentle breeze drifts through the yard…</div>
+  <div id="frenzyBanner" class="hidden">Feeding Frenzy! &nbsp;×2 Points</div>
+  <div id="arrivalBanner" class="hidden"></div>
+  <div id="scatterBuff" class="hidden">
+    <span class="sb-ic" data-ic="seed" data-icsize="16"></span>
+    <span class="sb-text">Fresh Seed <b id="sbPct">+50%</b></span>
+    <span class="sb-bar"><span class="sb-fill" id="sbFill"></span></span>
+  </div>
+  <div id="flavorLayer"></div>
 
-  <!-- Food selector -->
-  <div id="foodBar"></div>
+  <!-- ===== Left journal: Quests / Achievements / Shop / Settings ===== -->
+  <div id="journal">
+    <button id="journalToggle" class="journal-toggle" title="Toggle journal"><span class="jt-arrow">❯</span></button>
+    <div class="journal-inner panel">
+      <div class="journal-tabs">
+        <button class="jtab active" data-tab="quests"><span class="mi" data-ic="scroll" data-icsize="17"></span><span>Quests</span><span class="jbadge hidden" id="questsBadge"></span></button>
+        <button class="jtab" data-tab="ach"><span class="mi" data-ic="star" data-icsize="17"></span><span>Awards</span></button>
+        <button class="jtab" data-tab="shop"><span class="mi" data-ic="wrench" data-icsize="17"></span><span>Shop</span><span class="jbadge hidden" id="shopBadge"></span></button>
+        <button class="jtab" data-tab="settings"><span class="mi" data-ic="gear" data-icsize="17"></span><span>Setup</span></button>
+      </div>
+      <div class="journal-scroll">
+        <section class="jpanel" data-panel="quests">
+          <h3 class="j-h">Current Quest</h3>
+          <div id="questList" class="quest-list"></div>
+          <h3 class="j-h">Lure Guide <small>special birds in this biome</small></h3>
+          <div id="lureGuide" class="lure-guide"></div>
+          <h3 class="j-h">Next Biome</h3>
+          <div id="biomeCard" class="biome-card"></div>
+        </section>
+        <section class="jpanel hidden" data-panel="ach">
+          <h3 class="j-h">Achievements <small>permanent point bonuses</small></h3>
+          <div id="achList" class="ach-list"></div>
+        </section>
+        <section class="jpanel hidden" data-panel="shop">
+          <p class="j-intro">Spend Bird Points to grow your sanctuary.</p>
+          <div id="shopList" class="shop-list"></div>
+          <h3 class="j-h">Structures <small>lure rare &amp; legendary visitors</small></h3>
+          <div id="structureList" class="shop-list"></div>
+        </section>
+        <section class="jpanel hidden" data-panel="settings">
+          <h3 class="j-h">Settings</h3>
+          <div class="settings-list">
+            <button id="muteBtn" class="setting-btn"><span class="set-ic" id="muteIco" data-ic="speaker" data-icsize="20"></span><span class="set-lbl">Sound</span><b id="muteState">On</b></button>
+            <button id="resetBtn" class="setting-btn danger"><span class="set-ic" data-ic="reset" data-icsize="20"></span><span class="set-lbl">Reset all progress</span></button>
+          </div>
+          <p class="j-note">Backyard Birds — a cozy pixel feeder idle. Progress saves automatically.</p>
+        </section>
+      </div>
+    </div>
+  </div>
 
   <!-- Bottom action bar -->
   <div id="actionBar">
-    <button id="btnShop"  class="menu-btn"><span>🛠️</span>Shop</button>
-    <button id="btnGoals" class="menu-btn"><span>📋</span>Goals</button>
-    <button id="scatterBtn" class="scatter-btn"><span class="scatter-ico">🌾</span>Scatter<small>Space / click feeder</small></button>
-    <button id="btnIndex" class="menu-btn"><span>📖</span>Birds</button>
-    <button id="btnAreas" class="menu-btn"><span>🗺️</span>Areas</button>
-    <button id="btnMigrate" class="menu-btn"><span>🦅</span>Migrate</button>
+    <button id="btnFeeder" class="menu-btn"><span class="mi" data-ic="tray" data-icsize="24"></span>Feeder</button>
+    <button id="btnIndex"  class="menu-btn"><span class="mi" data-ic="book" data-icsize="24"></span>Birds</button>
+    <button id="btnMigrate" class="menu-btn"><span class="mi" data-ic="bird" data-icsize="24"></span>Migrate</button>
+  </div>
+
+  <!-- ===== Feeder details window ===== -->
+  <div class="overlay hidden" id="overlayFeeder">
+    <div class="sheet feeder-sheet">
+      <div class="sheet-head"><h2>Feeder Details</h2><button class="sheet-close" data-close>✕</button></div>
+      <div id="feederBody" class="feeder-body"></div>
+    </div>
   </div>
 
   <!-- ===== Overlay panels ===== -->
-  <div class="overlay hidden" id="overlayShop">
-    <div class="sheet">
-      <div class="sheet-head"><h2>🛠️ Shop</h2><button class="sheet-close" data-close>✕</button></div>
-      <p class="sheet-intro">Spend Bird Points to grow your sanctuary.</p>
-      <div id="shopList" class="shop-list"></div>
-    </div>
-  </div>
-
-  <div class="overlay hidden" id="overlayGoals">
-    <div class="sheet">
-      <div class="sheet-head"><h2>📋 Goals &amp; Achievements</h2><button class="sheet-close" data-close>✕</button></div>
-      <p class="sheet-intro">Your current objectives — always something to chase.</p>
-      <div id="questList" class="quest-list"></div>
-      <h3 class="sheet-sub">🏆 Achievements <small>(permanent point bonuses)</small></h3>
-      <div id="achList" class="ach-list"></div>
-    </div>
-  </div>
-
   <div class="overlay hidden" id="overlayIndex">
-    <div class="sheet">
-      <div class="sheet-head"><h2>📖 Bird Index</h2><button class="sheet-close" data-close>✕</button></div>
-      <p class="sheet-intro">Every species that has visited your feeders.</p>
-      <div id="indexGrid" class="index-grid"></div>
-    </div>
-  </div>
-
-  <div class="overlay hidden" id="overlayAreas">
-    <div class="sheet">
-      <div class="sheet-head"><h2>🗺️ Areas</h2><button class="sheet-close" data-close>✕</button></div>
-      <p class="sheet-intro">Unlock new habitats, each with their own birds &amp; scenery.</p>
-      <div id="areaList" class="area-list"></div>
+    <div class="sheet index-sheet">
+      <canvas id="indexStars" class="index-stars"></canvas>
+      <div class="sheet-head"><h2>Field Guide</h2><button class="sheet-close" data-close>✕</button></div>
+      <p class="sheet-intro">Every species that has visited your feeders, charted across the biomes.</p>
+      <div id="indexGrid" class="index-scroll"></div>
     </div>
   </div>
 
   <div class="overlay hidden" id="overlayMigrate">
     <div class="sheet">
-      <div class="sheet-head"><h2>🦅 Migration</h2><button class="sheet-close" data-close>✕</button></div>
+      <div class="sheet-head"><h2>Migration</h2><button class="sheet-close" data-close>✕</button></div>
       <div id="migrateInfo" class="migrate-info"></div>
-      <button id="migrateBtn" class="migrate-btn">🦅 Migrate</button>
-      <h3 class="sheet-sub">🪶 Permanent Boosts <small>(spend Feathers)</small></h3>
+      <button id="migrateBtn" class="migrate-btn">Migrate</button>
+      <h3 class="sheet-sub">Permanent Boosts <small>(spend Feathers)</small></h3>
       <div id="prestigeList" class="shop-list"></div>
     </div>
   </div>
@@ -108,8 +124,8 @@
       <div class="card-rarity" id="cardRarity">common</div>
       <p id="cardDesc">—</p>
       <div class="card-stats">
-        <span>✨ <b id="cardPoints">0</b> pts</span>
-        <span>👀 <b id="cardSeen">0</b>×</span>
+        <span><span class="ci" data-ic="star" data-icsize="13"></span> <b id="cardPoints">0</b> pts</span>
+        <span><span class="ci" data-ic="book" data-icsize="13"></span> <b id="cardSeen">0</b>×</span>
       </div>
       <div class="card-mastery" id="cardMastery"></div>
     </div>
