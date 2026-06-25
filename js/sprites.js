@@ -811,18 +811,119 @@ const Sprites = (() => {
     ctx.globalAlpha=1;
   }
 
-  /* ---- hawk (predator event) ---- */
+  /* ---- hawk (predator event): a mean red-tailed hawk in a side-on
+     swooping/attack pose — scowling brow, hooked beak, swept wing,
+     rufous banded tail and outstretched grasping talons ---- */
   function drawHawk(ctx,x,y,facing,flap){
     const dir=facing>=0?1:-1; x=Math.round(x); y=Math.round(y);
-    const body="#5b4326", wing="#6e5234", belly="#c2a373", out="#2b1f12";
-    const up=Math.round(Math.sin(flap)*5);
-    pell(ctx,x-dir*12,y+1,4,2,body);                                   // tail
-    pell(ctx,x-dir*10,y-up,10,3,out); pell(ctx,x-dir*10,y-up,9,2,wing);// far wing
-    pell(ctx,x,y,8,5,out); pell(ctx,x,y,7,4,body); pell(ctx,x+dir*1,y+1,4,3,belly);
-    pell(ctx,x+dir*6,y-3,3,3,out); pell(ctx,x+dir*6,y-3,3,3,body);     // head
-    px(ctx,x+dir*9,y-2,2,1,"#e0b23a"); px(ctx,x+dir*10,y-1,1,1,"#caa024"); // beak
-    dot(ctx,x+dir*7,y-3,"#f7e24a");                                   // eye
-    pell(ctx,x+dir*10,y-up,10,3,out); pell(ctx,x+dir*10,y-up,9,2,wing);// near wing
+    const out="#1d140a",  back="#5a3f22", backHi="#7a5630",
+          belly="#e3d0a6", bellyDk="#b6975f",
+          tail="#b35d2a", tailHi="#cf7437",
+          prim="#160f07",  cere="#f0bf3a", eye="#f7d20f";
+    const ph=Math.sin(flap);
+
+    // a swept wing, tapering from shoulder root to a splayed primary tip
+    const wing=(sx,sy,tx,ty,thick,col,colHi)=>{
+      const n=9;
+      for(let i=0;i<=n;i++){ const f=i/n;
+        const fx=Math.round(sx+(tx-sx)*f), fy=Math.round(sy+(ty-sy)*f);
+        const h=Math.max(1,Math.round(thick*(1-f)+1));
+        px(ctx,fx,fy-h,2,h*2,out);
+        px(ctx,fx,fy-h+1,1,h*2-2, i<n*0.4?col:colHi);
+      }
+      px(ctx,tx-dir*1,ty-2,3,1,prim); px(ctx,tx,ty,3,1,prim); px(ctx,tx-dir*1,ty+2,3,1,prim);
+    };
+
+    wing(x-dir*1, y-1, x-dir*7, y+4-Math.round(ph*2), 3, "#4a3219","#4a3219"); // far wing
+
+    // fanned rufous tail, dark terminal band
+    pell(ctx,x-dir*9,y+1,5,4,out);
+    pell(ctx,x-dir*9,y+1,4,3,tail); pell(ctx,x-dir*8,y,3,2,tailHi);
+    px(ctx,x-dir*13,y-1,2,5,out);
+
+    // body + pale streaked underside
+    pell(ctx,x,y,7,4,out); pell(ctx,x,y-1,6,3,back); pell(ctx,x-dir*1,y-2,3,2,backHi);
+    pell(ctx,x+dir*2,y+2,4,2,belly);
+    dot(ctx,x+dir*1,y+2,bellyDk); dot(ctx,x+dir*3,y+3,bellyDk); dot(ctx,x+dir*4,y+2,bellyDk);
+
+    // outstretched talons (reaching forward to strike)
+    const foot=(lx,ly)=>{
+      px(ctx,lx,ly,1,2,cere);
+      dot(ctx,lx-dir*1,ly+2,cere); dot(ctx,lx,ly+2,cere); dot(ctx,lx+dir*1,ly+2,cere);
+      dot(ctx,lx-dir*1,ly+3,out);  dot(ctx,lx,ly+3,out);  dot(ctx,lx+dir*1,ly+3,out);
+    };
+    foot(x+dir*3,y+3); foot(x+dir*6,y+4);
+
+    // mean head: hooked beak, fierce eye, heavy scowling brow
+    pell(ctx,x+dir*6,y-2,3,3,out); pell(ctx,x+dir*6,y-2,3,2,back); pell(ctx,x+dir*6,y-3,2,1,backHi);
+    px(ctx,x+dir*9,y-1,2,1,cere); dot(ctx,x+dir*11,y-1,"#caa024");      // hooked beak
+    dot(ctx,x+dir*10,y,out); dot(ctx,x+dir*11,y,out);
+    dot(ctx,x+dir*8,y-2,eye);                                            // eye
+    px(ctx,x+dir*7,y-3,3,1,out); dot(ctx,x+dir*9,y-2,out);              // brow ridge / scowl
+
+    wing(x+dir*1, y-2, x-dir*4, y-9-Math.round(ph*3), 4, back, backHi); // near wing (raised)
+  }
+
+  /* ---- seed-thief critters (squirrel & chipmunk events) ----
+     drawn from a feet/ground origin (x,y); they sit & nibble at the
+     feeder, then scurry off if not shooed. t drives a gentle idle bob. */
+  function drawSquirrel(ctx,x,y,facing,t){
+    const dir=facing>=0?1:-1; x=Math.round(x); y=Math.round(y); t=t||0;
+    const out="#2a1c0f", body="#a9743f", back="#8a5d30", bodyHi="#c08c50",
+          belly="#e8d6ab", tail="#b5783f", fringe="#e3c896", nose="#3a2a1a", seed="#d6b06a";
+    y+=Math.round(Math.sin(t*3)*0.5);
+    pell(ctx,x,y+1,7,2,"rgba(40,30,18,.28)");                          // ground shadow
+
+    // big bushy tail: a plume curling up behind and over the back
+    const tailPts=[[-4,-2],[-6,-6],[-6,-11],[-4,-14],[-1,-15]];
+    for(const[ax,ay]of tailPts) pell(ctx,x+dir*ax,y+ay,4,4,out);
+    for(const[ax,ay]of tailPts) pell(ctx,x+dir*ax,y+ay,3,3,tail);
+    px(ctx,x-dir*9,y-7,2,4,fringe); dot(ctx,x-dir*8,y-3,fringe);
+    dot(ctx,x-dir*7,y-13,fringe); dot(ctx,x-dir*5,y-16,fringe); dot(ctx,x-dir*2,y-17,fringe);
+
+    // haunch / back foot
+    pell(ctx,x,y-2,4,3,out); pell(ctx,x,y-2,3,2,back);
+    px(ctx,x+dir*2,y-1,3,2,out); px(ctx,x+dir*2,y-1,3,1,body);
+
+    // body (upright) + pale belly
+    pell(ctx,x+dir*1,y-7,4,5,out); pell(ctx,x+dir*1,y-7,3,4,body); pell(ctx,x+dir*1,y-8,2,2,bodyHi);
+    pell(ctx,x+dir*3,y-6,2,3,belly);
+
+    // head
+    pell(ctx,x+dir*4,y-11,3,3,out); pell(ctx,x+dir*4,y-11,3,2,body);
+    px(ctx,x+dir*3,y-14,2,2,out); px(ctx,x+dir*3,y-14,1,1,back);       // ear
+    dot(ctx,x+dir*4,y-13,bodyHi);
+    dot(ctx,x+dir*6,y-10,"#ffffff"); dot(ctx,x+dir*5,y-11,out);        // eye + glint
+    dot(ctx,x+dir*7,y-10,nose);                                        // nose
+
+    // front paws holding a seed at the mouth
+    px(ctx,x+dir*5,y-8,2,1,body); dot(ctx,x+dir*6,y-9,seed); dot(ctx,x+dir*7,y-9,seed);
+  }
+  function drawChipmunk(ctx,x,y,facing,t){
+    const dir=facing>=0?1:-1; x=Math.round(x); y=Math.round(y); t=t||0;
+    const out="#2a1c0f", body="#b07d44", back="#9c6a37", belly="#efe1bf",
+          dk="#34251a", lt="#f2e8cf", nose="#3a2a1a";
+    y+=Math.round(Math.sin(t*3.4)*0.5);
+    pell(ctx,x,y+1,6,2,"rgba(40,30,18,.28)");                          // shadow
+
+    pell(ctx,x-dir*4,y-4,2,4,out); pell(ctx,x-dir*4,y-4,2,3,back); dot(ctx,x-dir*4,y-6,lt); // stubby tail
+
+    // body (low, on all fours) + pale belly
+    pell(ctx,x,y-3,5,3,out); pell(ctx,x,y-3,4,2,body);
+    pell(ctx,x+dir*1,y-2,3,1,belly);
+    px(ctx,x-dir*2,y-5,5,1,dk); px(ctx,x-dir*2,y-4,5,1,lt);            // signature racing stripe
+    dot(ctx,x-dir*2,y,out); dot(ctx,x+dir*2,y,out);                    // feet
+
+    // head with a stuffed cheek pouch
+    pell(ctx,x+dir*4,y-5,3,3,out); pell(ctx,x+dir*4,y-5,3,2,body);
+    pell(ctx,x+dir*4,y-3,2,2,belly);                                   // fat cheek
+    px(ctx,x+dir*3,y-7,1,2,out);                                       // ear
+    dot(ctx,x+dir*5,y-5,"#ffffff"); dot(ctx,x+dir*4,y-5,out);          // eye
+    px(ctx,x+dir*3,y-5,1,1,lt);                                        // eye stripe
+    dot(ctx,x+dir*6,y-4,nose);                                         // nose
+  }
+  function drawCritter(ctx,kind,x,y,facing,t){
+    if(kind==="chipmunk") drawChipmunk(ctx,x,y,facing,t); else drawSquirrel(ctx,x,y,facing,t);
   }
 
   /* ===========================================================
@@ -966,7 +1067,7 @@ const Sprites = (() => {
   }
 
   return { L, drawBackground, drawFeeder, drawBird, drawPortrait, drawDecor, drawDecorScaled, drawTapHint,
-           drawScatterAura, drawScatterBurst, drawArrivalBurst, drawHawk,
+           drawScatterAura, drawScatterBurst, drawArrivalBurst, drawHawk, drawCritter,
            drawIcon, iconCanvas, perchSlots, standHeight, pixelText, pixelTextWidth, shade };
 })();
 

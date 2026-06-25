@@ -25,6 +25,7 @@ const CONFIG = {
   seasonDays: 3,            // in-game days per season
   goldenEvery: [70,130],    // seconds between golden visitors
   hawkEvery: [130,220],     // seconds between hawk swoops
+  critterEvery: [110,190],  // seconds between seed-thief critters (squirrel / chipmunk)
   frenzyNeed: 6, frenzyWindow: 12, frenzyTime: 15, frenzyMult: 2,
   goldenMult: 8,            // golden bird point multiplier
 };
@@ -196,6 +197,7 @@ const frenzyTimeNow= () => CONFIG.frenzyTime + state.upgrades.frenzy*4;         
 const goldenRoll   = () => { const f=Math.pow(0.85, state.upgrades.flowers)*Math.pow(0.82, state.upgrades.goldenTide); return rnd(CONFIG.goldenEvery[0]*f, CONFIG.goldenEvery[1]*f); }; // Pollinator Garden / Golden Tides
 const goldenValueMult = () => 1 + state.upgrades.goldenTide*0.25;             // Golden Tides
 const hawkRoll     = () => { const f=1 + state.upgrades.antihawk*0.55; return rnd(CONFIG.hawkEvery[0]*f, CONFIG.hawkEvery[1]*f); };            // Owl Decoy
+const critterRoll  = () => rnd(CONFIG.critterEvery[0], CONFIG.critterEvery[1]);   // (a baffle upgrade can lengthen this later)
 const spawnInterval= () => Math.max(1.1, CONFIG.baseSpawn
                           * Math.pow(0.9, state.upgrades.attractor)
                           * Math.pow(0.95, state.prestige.pSpawn)
@@ -221,8 +223,8 @@ let spawnTimer=2.0, scatterCharge=1, scatterBurstT=-10;
 let pendingOffline=null, pendingDaily=null;
 let bgInterval=null, bgLast=0, bgGained=0;
 let weather="clear", weatherTimer=20;
-let goldenTimer=rnd(...CONFIG.goldenEvery), hawkTimer=rnd(...CONFIG.hawkEvery);
-let hawk=null, frenzyUntil=0, recentHappy=[];
+let goldenTimer=rnd(...CONFIG.goldenEvery), hawkTimer=rnd(...CONFIG.hawkEvery), critterTimer=rnd(...CONFIG.critterEvery);
+let hawk=null, critter=null, frenzyUntil=0, recentHappy=[];
 let dailyVisitorId=null;
 const poolCache={};
 function rnd(a,b){ return a+Math.random()*(b-a); }
@@ -435,6 +437,64 @@ function updateHawk(dt){
   if(hawk.x<-40 || hawk.x>Sprites.L.W+40) hawk=null;
 }
 
+/* ---- seed-thief critters (squirrel & chipmunk) -------------------------------
+   A critter scurries in to the feeder base and stuffs its cheeks — a small loot
+   pile of Bird Points grows while it nibbles. Click it in time and it drops the
+   seed back to you (+loot ✨). Ignore it and it scurries off with the (small,
+   capped) loot. Unlike the hawk it doesn't scare birds — it's a resource pest. */
+function critterLootMax(kind){
+  const oneVisit=Math.max(1, avgBirdValue()*pointMult());       // ~ one average happy visit
+  const n = kind==="chipmunk" ? rnd(5,7) : rnd(10,14);          // squirrels are greedier
+  return Math.round(oneVisit*n);
+}
+function spawnCritter(){
+  if(critter || hawk) return;
+  const kind=Math.random()<0.5?"squirrel":"chipmunk";
+  const fromLeft=Math.random()<0.5;
+  const edge = fromLeft ? -16 : Sprites.L.W+16;
+  critter={ kind, x:edge, facing:fromLeft?1:-1,
+            tx:Sprites.L.feeder.x + (fromLeft?-18:18),           // sit just beside the feeder base
+            y:Sprites.L.groundContact, st:"approach", t:0,
+            dwell: kind==="chipmunk"?3:5, lootMax:critterLootMax(kind), loot:0 };
+  ticker(kind==="chipmunk"
+    ? "🐿️ A chipmunk is raiding the feeder! Click it to chase it off!"
+    : "🐿️ A squirrel is raiding the feeder! Click it to chase it off!");
+}
+function updateCritter(dt){
+  if(!critter) return;
+  const c=critter; c.t+=dt;
+  if(c.st==="approach"){
+    const dx=c.tx-c.x, d=Math.abs(dx);
+    c.facing = dx>=0?1:-1;
+    if(d<=2){ c.x=c.tx; c.st="steal"; c.t=0; }
+    else c.x += Math.sign(dx)*Math.min(d, 90*dt);
+  } else if(c.st==="steal"){
+    c.loot = Math.min(c.lootMax, Math.round(c.lootMax*(c.t/c.dwell)));
+    if(c.t>=c.dwell){                                            // got away with the loot
+      const taken=Math.min(c.loot, Math.floor(state.points));
+      if(taken>0){ state.points-=taken; addFloat(c.x, c.y-26, "-"+taken, "#c8553f"); }
+      ticker(c.kind==="chipmunk" ? "🐿️ The chipmunk scampered off with your seed…"
+                                  : "🐿️ The squirrel made off with your seed…");
+      sfx("sad");
+      c.facing=-c.facing; c.st="flee";        // turn tail and bolt the way it came
+      refreshHUD(); save();
+    }
+  } else if(c.st==="flee"){
+    c.x += c.facing*120*dt;
+    if(c.x<-20 || c.x>Sprites.L.W+20) critter=null;
+  }
+}
+function shooCritter(){                                          // caught it — it drops the seed
+  const c=critter; if(!c) return;
+  const got=Math.round(c.loot);
+  if(got>0){ addPoints(got); addFloat(c.x, c.y-26, "+"+got, "#e8c34a"); flashStat("pointsVal"); }
+  ticker(got>0 ? `🐿️ You chased it off and saved your seed! +${got.toLocaleString()}✨`
+               : "🐿️ You chased it off before it grabbed anything!");
+  sfx("buy");
+  c.facing=-c.facing; c.st="flee"; c.loot=0;   // turn tail and bolt the way it came
+  refreshHUD(); save();
+}
+
 /* ============================================================
    LIVING WORLD: clock, seasons, weather, golden, daily
    ============================================================ */
@@ -465,6 +525,10 @@ function updateWorld(dt){
   // hawk
   hawkTimer-=dt;
   if(hawkTimer<=0){ hawkTimer=hawkRoll(); spawnHawk(); }
+
+  // seed-thief critter
+  critterTimer-=dt;
+  if(critterTimer<=0){ critterTimer=critterRoll(); spawnCritter(); }
 }
 function areaName(){ return (AREAS.find(a=>a.id===state.area)||{}).name||"yard"; }
 
@@ -506,6 +570,7 @@ function update(dt){
   arrivalFx=arrivalFx.filter(e=>e.p<1);
   if(flashVignette>0) flashVignette=Math.max(0, flashVignette - dt*1.5);
   updateHawk(dt);
+  updateCritter(dt);
   for(const f of floats){ f.y+=f.vy*dt; f.life-=dt; } floats=floats.filter(f=>f.life>0);
   for(const s of seeds){ s.vy+=240*dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt; if(s.y>=s.gy){ s.y=s.gy; s.vy*=-0.35; s.vx*=0.6; } }
   seeds=seeds.filter(s=>s.life>0);
@@ -560,6 +625,13 @@ function render(){
     if(b.golden) goldSparkle(b);
   }
   if(hawk) Sprites.drawHawk(ctx, hawk.x, hawk.y, hawk.facing, hawk.flap);
+  if(critter){
+    Sprites.drawCritter(ctx, critter.kind, critter.x, critter.y, critter.facing, t);
+    if(critter.st==="steal" && critter.loot>0){            // live "loot at stake" readout
+      const txt="+"+Math.round(critter.loot), w=Sprites.pixelTextWidth(txt,1), tx=Math.round(critter.x-w/2), ty=Math.round(critter.y-30);
+      Sprites.pixelText(ctx,tx+1,ty+1,txt,"#3a2a1a",1); Sprites.pixelText(ctx,tx,ty,txt,"#e8c34a",1);
+    }
+  }
 
   // rare/legendary arrival bursts
   for(const e of arrivalFx) Sprites.drawArrivalBurst(ctx, e.x, e.y, Math.min(1,e.p), e.color, e.leg);
@@ -1139,7 +1211,7 @@ function buildBiomeCard(){
 }
 function switchArea(id){
   if(!state.unlockedAreas[id] || id===state.area) return;
-  state.area=id; birds=[]; occupied.clear(); hawk=null; spawnTimer=1.0;
+  state.area=id; birds=[]; occupied.clear(); hawk=null; critter=null; spawnTimer=1.0;
   buildStructures(); buildLureGuide(); buildBiomeCard(); refreshHUD();
   ticker(`Travelled to the ${areaName()}. ${(AREAS.find(a=>a.id===id)||{}).emoji||""}`); sfx("scatter"); save();
 }
@@ -1181,7 +1253,7 @@ function doMigrate(){
     feathers:state.feathers, migrations:state.migrations, prestige:state.prestige,
     flags:state.flags, clock:state.clock, dayCount:state.dayCount, lastDay:state.lastDay, streak:state.streak, muted:state.muted };
   state=Object.assign(defaultState(), keep);
-  birds=[]; occupied.clear(); seeds=[]; floats=[]; hawk=null; frenzyUntil=0; recentHappy=[];
+  birds=[]; occupied.clear(); seeds=[]; floats=[]; hawk=null; critter=null; frenzyUntil=0; recentHappy=[];
   spawnTimer=1.5; scatterCharge=1;
   buildShop(); buildStructures(); buildFoods(); buildQuests(); buildPrestige();
   checkBiomeUnlock(); buildLureGuide(); buildBiomeCard(); refreshHUD(); closePanels();
@@ -1292,15 +1364,19 @@ function onCanvasClick(e){
   // hawk?
   if(hawk && Math.hypot(p.x-hawk.x,p.y-hawk.y)<22){ const fr=1; state.feathers+=fr; addFloat(hawk.x,hawk.y-14,"+1","#e8c34a");
     ticker("🦅 You shooed the hawk away! +1🪶"); sfx("buy"); hawk=null; refreshHUD(); save(); return; }
+  // seed-thief critter? (check before the feeder so catching it doesn't scatter)
+  if(overCritter(p)){ shooCritter(); return; }
   // golden bird?
   for(const b of birds){ if(b.golden && b.st!=="leaving" && Math.hypot(p.x-b.x,p.y-b.y)<16){ collectGolden(b); return; } }
   // feeder → scatter fresh seed (the details window lives on the "Feeder" button)
   if(overFeeder(p)){ state.flags.tappedFeeder=true; scatter(); }
 }
 function overFeeder(p){ const f=Sprites.L.feeder; return p.x>f.x-46&&p.x<f.x+46&&p.y>f.trayY-58&&p.y<Sprites.L.groundContact; }
+function critterCatchable(){ return !!critter && (critter.st==="approach" || critter.st==="steal"); }
+function overCritter(p){ return critterCatchable() && Math.abs(p.x-critter.x)<14 && p.y>critter.y-22 && p.y<critter.y+6; }
 function onCanvasHover(e){
   const p=canvasToInternal(e);
-  let hot = overFeeder(p) || (hawk && Math.hypot(p.x-hawk.x,p.y-hawk.y)<22);
+  let hot = overFeeder(p) || overCritter(p) || (hawk && Math.hypot(p.x-hawk.x,p.y-hawk.y)<22);
   if(!hot) for(const b of birds){ if(b.golden && b.st!=="leaving" && Math.hypot(p.x-b.x,p.y-b.y)<16){ hot=true; break; } }
   canvas.style.cursor = hot ? "pointer" : "default";
 }
@@ -1335,7 +1411,7 @@ function wireUI(){
   $("cardClose").addEventListener("click",()=>$("cardModal").classList.add("hidden"));
   document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{ if(e.target===o) o.classList.add("hidden"); }));
   $("muteBtn").addEventListener("click",()=>{ state.muted=!state.muted; setIcon("muteIco",state.muted?"mute":"speaker",20); $("muteState").textContent=state.muted?"Off":"On"; if(state.muted) setAmbientMuted(true); else { startAmbient(); setAmbientMuted(false); } save(); });
-  $("resetBtn").addEventListener("click",()=>{ if(confirm("Erase ALL progress (including Feathers & collection) and start completely over?")){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} state=defaultState(); birds=[]; occupied.clear(); floats=[]; seeds=[]; hawk=null; buildShop(); buildStructures(); buildIndex(); buildQuests(); buildAchievements(); buildPrestige(); buildLureGuide(); buildBiomeCard(); setIcon("muteIco","speaker",20); $("muteState").textContent="On"; refreshHUD(); closePanels(); ticker("A brand new world."); } });
+  $("resetBtn").addEventListener("click",()=>{ if(confirm("Erase ALL progress (including Feathers & collection) and start completely over?")){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} state=defaultState(); birds=[]; occupied.clear(); floats=[]; seeds=[]; hawk=null; critter=null; buildShop(); buildStructures(); buildIndex(); buildQuests(); buildAchievements(); buildPrestige(); buildLureGuide(); buildBiomeCard(); setIcon("muteIco","speaker",20); $("muteState").textContent="On"; refreshHUD(); closePanels(); ticker("A brand new world."); } });
   window.addEventListener("keydown",e=>{ if(e.code==="Space"){ e.preventDefault(); state.flags.tappedFeeder=true; scatter(); } if(e.code==="Escape") closePanels(); });
   window.addEventListener("beforeunload",save);
   window.addEventListener("resize",()=>{ if(!$("overlayIndex").classList.contains("hidden")) drawIndexStars(); });

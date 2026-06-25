@@ -52,6 +52,10 @@ earn is credited (and announced) when you return.
 - **Golden visitors** — click the shimmering golden bird for a big payout.
 - **Hawk!** — a predator occasionally swoops in; click to shoo it before it scares
   your birds off.
+- **Seed thieves** — a squirrel or chipmunk sometimes raids the feeder and starts
+  stuffing its cheeks. Click it in time and it drops the seed back to you (you keep
+  the points it had grabbed); ignore it and it scurries off with a small, capped
+  pile. Birds keep visiting either way — they're pests, not bird-scarers.
 - **Feeding frenzy** — keep birds happy in quick succession for a ×2 points burst.
 - **Migration (prestige)** — once you've built up a run, migrate to reset for
   **Feathers**, a meta-currency that buys permanent boosts. Your collection,
