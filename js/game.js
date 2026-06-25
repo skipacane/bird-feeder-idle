@@ -225,6 +225,7 @@ let bgInterval=null, bgLast=0, bgGained=0;
 let weather="clear", weatherTimer=20;
 let goldenTimer=rnd(...CONFIG.goldenEvery), hawkTimer=rnd(...CONFIG.hawkEvery), critterTimer=rnd(...CONFIG.critterEvery);
 let hawk=null, critter=null, frenzyUntil=0, recentHappy=[];
+let critterBag=[];   // shuffle-bag for squirrel/chipmunk selection (even mix, no long streaks)
 let dailyVisitorId=null;
 const poolCache={};
 function rnd(a,b){ return a+Math.random()*(b-a); }
@@ -232,7 +233,12 @@ function rnd(a,b){ return a+Math.random()*(b-a); }
 /* ============================================================
    SAVE / LOAD / IDLE
    ============================================================ */
-function save(){ state.lastSave=Date.now(); try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){} }
+function save(){ state.lastSave=Date.now();
+  // mirror the live event timers + critter bag into state so they persist across
+  // reloads (so a refresh can't re-roll or dodge an incoming hawk/critter)
+  state.timers={ golden:goldenTimer, hawk:hawkTimer, critter:critterTimer };
+  state.critterBag=critterBag.slice();
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){} }
 function load(){
   try{
     const raw=localStorage.getItem(SAVE_KEY);
@@ -246,6 +252,13 @@ function load(){
       state.unlockedFoods=Object.assign({seed:true}, s.unlockedFoods||{});
       state.structures=Object.assign({}, s.structures||{});
       state.discovered=s.discovered||{}; state.seen=s.seen||{}; state.speciesFed=s.speciesFed||{};
+      // resume the event countdowns where they left off (frozen while away)
+      if(s.timers){
+        if(typeof s.timers.golden==="number")  goldenTimer =s.timers.golden;
+        if(typeof s.timers.hawk==="number")    hawkTimer   =s.timers.hawk;
+        if(typeof s.timers.critter==="number") critterTimer=s.timers.critter;
+      }
+      if(Array.isArray(s.critterBag)) critterBag=s.critterBag.filter(k=>k==="squirrel"||k==="chipmunk");
     }
   }catch(e){ state=defaultState(); }
 }
@@ -447,9 +460,18 @@ function critterLootMax(kind){
   const n = kind==="chipmunk" ? rnd(5,7) : rnd(10,14);          // squirrels are greedier
   return Math.round(oneVisit*n);
 }
+// Draw the next critter species from a shuffle bag rather than an independent coin
+// flip — guarantees an even squirrel/chipmunk mix and avoids long same-species runs.
+function nextCritterKind(){
+  if(critterBag.length===0){
+    critterBag=["squirrel","chipmunk"];
+    for(let i=critterBag.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [critterBag[i],critterBag[j]]=[critterBag[j],critterBag[i]]; }
+  }
+  return critterBag.pop();
+}
 function spawnCritter(){
   if(critter || hawk) return;
-  const kind=Math.random()<0.5?"squirrel":"chipmunk";
+  const kind=nextCritterKind();
   const fromLeft=Math.random()<0.5;
   const edge = fromLeft ? -16 : Sprites.L.W+16;
   critter={ kind, x:edge, facing:fromLeft?1:-1,
@@ -1411,7 +1433,9 @@ function wireUI(){
   $("cardClose").addEventListener("click",()=>$("cardModal").classList.add("hidden"));
   document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{ if(e.target===o) o.classList.add("hidden"); }));
   $("muteBtn").addEventListener("click",()=>{ state.muted=!state.muted; setIcon("muteIco",state.muted?"mute":"speaker",20); $("muteState").textContent=state.muted?"Off":"On"; if(state.muted) setAmbientMuted(true); else { startAmbient(); setAmbientMuted(false); } save(); });
-  $("resetBtn").addEventListener("click",()=>{ if(confirm("Erase ALL progress (including Feathers & collection) and start completely over?")){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} state=defaultState(); birds=[]; occupied.clear(); floats=[]; seeds=[]; hawk=null; critter=null; buildShop(); buildStructures(); buildIndex(); buildQuests(); buildAchievements(); buildPrestige(); buildLureGuide(); buildBiomeCard(); setIcon("muteIco","speaker",20); $("muteState").textContent="On"; refreshHUD(); closePanels(); ticker("A brand new world."); } });
+  $("resetBtn").addEventListener("click",()=>{ if(confirm("Erase ALL progress (including Feathers & collection) and start completely over?")){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} state=defaultState(); birds=[]; occupied.clear(); floats=[]; seeds=[]; hawk=null; critter=null;
+    goldenTimer=rnd(...CONFIG.goldenEvery); hawkTimer=rnd(...CONFIG.hawkEvery); critterTimer=rnd(...CONFIG.critterEvery); critterBag=[];
+    buildShop(); buildStructures(); buildIndex(); buildQuests(); buildAchievements(); buildPrestige(); buildLureGuide(); buildBiomeCard(); setIcon("muteIco","speaker",20); $("muteState").textContent="On"; refreshHUD(); closePanels(); ticker("A brand new world."); } });
   window.addEventListener("keydown",e=>{ if(e.code==="Space"){ e.preventDefault(); state.flags.tappedFeeder=true; scatter(); } if(e.code==="Escape") closePanels(); });
   window.addEventListener("beforeunload",save);
   window.addEventListener("resize",()=>{ if(!$("overlayIndex").classList.contains("hidden")) drawIndexStars(); });
